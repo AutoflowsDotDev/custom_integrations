@@ -1,0 +1,27 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+
+    <documentation>
+    Create full and detailed documentation of the entire project.
+    
+    
+    <user_docs>
+        • Create detailed README.md with:
+        - Project overview and purpose
+        - Installation instructions
+        - Usage examples
+        - Configuration options
+    </user_docs>
+
+    <developer_docs>
+        • CONTRIBUTING.md with development setup steps
+        • architecture.md with component diagrams
+        • API endpoint and data model documentation
+    </developer_docs>
+
+    </documentation>
+
+    

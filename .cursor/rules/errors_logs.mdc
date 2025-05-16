@@ -1,0 +1,26 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+<error_handling>
+    • Implement proper error handling with custom exceptions
+    • Use try-except blocks with specific exception types
+</error_handling>
+
+
+<logging>
+• Implement comprehensive logging with multiple severity levels:
+    - DEBUG: Detailed information for debugging
+    - INFO: Confirmation that things are working
+    - WARNING: Indication of potential issues
+    - ERROR: Errors that don't terminate execution
+    - CRITICAL: Critical errors causing termination
+
+• Configure logging to support both file and stdout outputs
+• Include contextual information in log entries (timestamps, request IDs, context)
+• Add structured logging for better searchability
+• Implement log rotation for production environments
+</logging>
+
+

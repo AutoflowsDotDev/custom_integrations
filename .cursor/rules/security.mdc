@@ -1,0 +1,10 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+<security>
+    Do a full security review of project and fix ALL major vulnerabilities
+
+
+</security>

@@ -1,0 +1,41 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+
+<deployment>
+Create all required scripts to properly deploy this automation workflow.
+
+<fastAPI>
+    • Create FastAPI wrapper server with complete OpenAPI/Swagger documentation
+    • Add monitoring and health check endpoints
+</fastAPI>
+
+<docker>
+    • Include production-ready Dockerfile and docker-compose.yml
+    • Include installation script (bash compatible)
+</docker>
+
+<defaults>
+    • Deploy to digital ocean app container by default
+
+</defaults>
+<cicd>
+    • Implement complete GitHub Actions workflow
+    • Include CI/CD pipeline configuration
+
+</cicd>
+
+
+
+
+
+
+
+
+
+
+
+
+</deployment>

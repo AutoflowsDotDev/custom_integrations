@@ -1,0 +1,20 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+You have the following MCP servers at your disposal. Use them generously.
+
+
+github: use this to search code repos on github to find similar code snippets that could be useful for the given task.
+
+
+perplexity-ask: use this to get a deep summarized search of the web that included social media and youtube as sources.
+
+
+brave: use this as the default go-to web search tool.
+
+playwright: use this as the default go-to browser use tool.
+
+
+context7: use this as the default programming language documentation tool. this contains thousands of the most common up-to-date libraries for many languages

@@ -1,0 +1,12 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+<testing>
+        • Write comprehensive unit tests with pytest (aim for 90%+ coverage)
+        • Create integration tests for system components (API contracts, database interactions)
+        • Generate accurate mock data and API responses
+        • Include test coverage reporting
+        • Add performance/load testing where appropriate
+    </testing>
