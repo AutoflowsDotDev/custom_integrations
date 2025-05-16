@@ -1,0 +1,12 @@
+google-api-python-client==2.134.0
+google-auth-oauthlib==1.2.0
+google-cloud-pubsub==2.20.0
+slack-sdk==3.29.1
+transformers==4.40.1
+torch==2.3.0
+python-dotenv==1.0.1
+
+# Optional: For a web server if handling Pub/Sub push via HTTP endpoint
+# flask==3.0.3
+# fastapi==0.111.0
+# uvicorn[standard]==0.29.0 # For running FastAPI 
