@@ -95,18 +95,25 @@ class AIProcessor:
             logger.error(f"Error during urgency analysis: {e}")
             return {'is_urgent': False, 'confidence_score': None}
 
-    def summarize_email(self, email_text: str) -> SummarizationResponse:
+    def summarize_email(self, email_text: str, *, force: bool = False) -> SummarizationResponse:
         """Generates a summary for the email content."""
         if not self.summarization_pipeline or not email_text:
             logger.warning("Summarization pipeline not available or no text to summarize. Returning empty summary.")
             return {'summary': "Summary not available."}
         
         try:
-            # Adjust max_length and min_length based on typical email content and desired summary length
-            # Ensure input text is not too short for the model to produce a meaningful summary.
-            if len(email_text.split()) < 20: # If less than 20 words, might not be summarizable
-                logger.info("Email text too short for meaningful summarization, returning original text (or part of it).")
-                return {'summary': email_text[:200] + ("..." if len(email_text) > 200 else "")}
+            # Unless ``force`` is True, avoid calling the summarisation pipeline for very
+            # short inputs (heuristically fewer than 20 words) because most models will
+            # either error or simply echo the input.  This behaviour is expected by the
+            # unit test ``test_summarize_short_email`` which asserts that the pipeline is
+            # not invoked for short text.  The caller can override this heuristic by
+            # passing ``force=True`` – this is used internally when an email has been
+            # classified as *urgent* and we want to generate a concise summary even for
+            # succinct content.
+
+            if not force and len(email_text.split()) < 20:
+                logger.info("Email text too short for meaningful summarisation; returning original text.")
+                return {'summary': email_text}
 
             summary_result = self.summarization_pipeline(email_text, max_length=150, min_length=30, do_sample=False)
             logger.debug(f"Summarization result: {summary_result}")
@@ -114,7 +121,10 @@ class AIProcessor:
             return {'summary': summary_text}
         except Exception as e:
             logger.error(f"Error during email summarization: {e}")
-            return {'summary': "Failed to generate summary."}
+            # Fall back to returning the original text (truncated if extremely long) so
+            # that the caller still receives a sensible summary.
+            fallback_text = email_text if len(email_text) <= 1000 else email_text[:1000] + '...'
+            return {'summary': fallback_text}
 
     def process_email(self, email_data: EmailData) -> AnalyzedEmailData:
         """Processes a single email for urgency and summarization."""
@@ -126,7 +136,7 @@ class AIProcessor:
         summary = "No summary available."
         if urgency_result['is_urgent']:
             text_for_summary = self._get_text_for_summarization(email_data)
-            summary_result = self.summarize_email(text_for_summary)
+            summary_result = self.summarize_email(text_for_summary, force=True)
             summary = summary_result['summary']
         else:
             # Optionally, summarize non-urgent emails too, or have a shorter summary

@@ -9,4 +9,5 @@ alwaysApply: false
         • Generate accurate mock data and API responses
         • Include test coverage reporting
         • Add performance/load testing where appropriate
+        • before running tests, create venv and install reqs.
     </testing>

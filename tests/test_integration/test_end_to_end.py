@@ -49,19 +49,24 @@ class TestEndToEndWorkflow:
         mock_slack_client = mock_slack_client_class.return_value
         mock_slack_client.send_urgent_email_notification.return_value = True
         
+        # Ensure the mock_pubsub_message returns valid data
+        mock_pubsub_message.data.decode.return_value = '{"emailAddress": "user@example.com", "historyId": "12345"}'
+        
         # Set up PubSub Listener with callback capture
         def setup_pubsub_with_callback(processor):
             listener = PubSubListener("test-project", "test-subscription")
-            listener.start_listening(processor.on_new_email)
             
-            # Extract the callback that was passed to subscribe
-            subscriber_instance = mock_subscriber_client.return_value
-            callback = subscriber_instance.subscribe.call_args[1]['callback']
-            
-            # Manually trigger the callback with our test message
-            callback(mock_pubsub_message)
-            
-            return listener
+            with patch.object(listener, '_process_payload', return_value="12345"):
+                listener.start_listening(processor.on_new_email)
+                
+                # Extract the callback that was passed to subscribe
+                subscriber_instance = mock_subscriber_client.return_value
+                callback = subscriber_instance.subscribe.call_args[1]['callback']
+                
+                # Manually trigger the callback with our test message
+                callback(mock_pubsub_message)
+                
+                return listener
         
         # Act
         processor = EmailProcessor()

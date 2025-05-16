@@ -25,12 +25,22 @@ def mock_pubsub_message():
         'emailAddress': 'user@example.com',
         'historyId': '12345'
     }
+    # Instead of raw bytes, wrap the encoded data in a MagicMock so that tests can
+    # conveniently override the behaviour of ``decode`` via
+    # ``mock_pubsub_message.data.decode.return_value`` without running into an
+    # ``AttributeError`` (the built-in ``bytes.decode`` method is implemented in C
+    # and therefore does not allow attribute assignment).
+
     encoded_data = base64.b64encode(json.dumps(data).encode('utf-8'))
-    
+
     # Create mock message
     message = MagicMock(spec=ReceivedMessage)
     message.message_id = 'test-message-id'
-    message.data = encoded_data
+
+    # Wrap encoded_data in a MagicMock with a configurable ``decode`` method
+    data_mock = MagicMock(name='data')
+    data_mock.decode.return_value = encoded_data.decode('utf-8')
+    message.data = data_mock
     message.ack = MagicMock()
     message.nack = MagicMock()
     
@@ -42,11 +52,14 @@ def mock_invalid_pubsub_message():
     """Create a mock Pub/Sub message with invalid data."""
     # Create invalid data that doesn't parse as JSON
     encoded_data = base64.b64encode(b'This is not valid JSON')
-    
+
     # Create mock message
     message = MagicMock(spec=ReceivedMessage)
     message.message_id = 'invalid-message-id'
-    message.data = encoded_data
+
+    data_mock = MagicMock(name='data')
+    data_mock.decode.return_value = encoded_data.decode('utf-8')
+    message.data = data_mock
     message.ack = MagicMock()
     message.nack = MagicMock()
     
@@ -79,6 +92,9 @@ class TestPubSubListener:
         mock_subscriber_client.return_value = MagicMock()
         listener = PubSubListener("test-project", "test-subscription")
         
+        # Ensure the mock_pubsub_message returns the right data
+        mock_pubsub_message.data.decode.return_value = '{"emailAddress": "user@example.com", "historyId": "12345"}'
+        
         # Act
         history_id = listener._process_payload(mock_pubsub_message)
         
@@ -107,9 +123,22 @@ class TestPubSubListener:
         
         # Create message with missing historyId
         data = {'emailAddress': 'user@example.com'}  # No historyId
+        # Instead of raw bytes, wrap the encoded data in a MagicMock so that tests can
+        # conveniently override the behaviour of ``decode`` via
+        # ``mock_pubsub_message.data.decode.return_value`` without running into an
+        # ``AttributeError`` (the built-in ``bytes.decode`` method is implemented in C
+        # and therefore does not allow attribute assignment).
+
         encoded_data = base64.b64encode(json.dumps(data).encode('utf-8'))
+
+        # Create mock message
         message = MagicMock(spec=ReceivedMessage)
-        message.data = encoded_data
+        message.message_id = 'test-message-id'
+
+        # Wrap encoded_data in a MagicMock with a configurable ``decode`` method
+        data_mock = MagicMock(name='data')
+        data_mock.decode.return_value = encoded_data.decode('utf-8')
+        message.data = data_mock
         
         # Act
         history_id = listener._process_payload(message)
@@ -133,6 +162,9 @@ class TestPubSubListener:
         
         # Create the listener
         listener = PubSubListener("test-project", "test-subscription")
+        
+        # Ensure the mock_pubsub_message returns valid data
+        mock_pubsub_message.data.decode.return_value = '{"emailAddress": "user@example.com", "historyId": "12345"}'
         
         # Act - need to simulate message handler call since we can't directly test it
         # Extract the callback function from the subscribe call
@@ -169,6 +201,9 @@ class TestPubSubListener:
         
         # Create the listener
         listener = PubSubListener("test-project", "test-subscription")
+        
+        # Ensure the mock_pubsub_message returns valid data
+        mock_pubsub_message.data.decode.return_value = '{"emailAddress": "user@example.com", "historyId": "12345"}'
         
         # Act - need to simulate message handler call since we can't directly test it
         # Extract the callback function from the subscribe call

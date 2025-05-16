@@ -20,6 +20,91 @@ from src.slack_service.slack_client import SlackServiceClient
 
 logger = get_logger(__name__)
 
+def process_new_email(email_id: str) -> bool:
+    """Process a new email given its ID.
+    
+    Args:
+        email_id: The ID of the email to process
+        
+    Returns:
+        bool: True if processing was successful, False otherwise
+    """
+    try:
+        gmail_client = GmailClient()
+        ai_processor = AIProcessor()
+        slack_client = SlackServiceClient()
+        
+        # Get email details
+        email_data = gmail_client.get_email_details(email_id)
+        if not email_data:
+            logger.warning(f"Could not retrieve details for email ID: {email_id}")
+            return False
+            
+        # Analyze the email
+        analyzed_email = ai_processor.process_email(email_data)
+        
+        # If urgent, apply label and send notification
+        if analyzed_email['is_urgent']:
+            gmail_client.apply_urgent_label(email_id)
+            slack_client.send_urgent_email_notification(analyzed_email)
+            
+        return True
+    except Exception as e:
+        logger.error(f"Error processing email {email_id}: {e}")
+        return False
+
+class EmailProcessor:
+    """Handles the processing of emails."""
+    
+    def __init__(self) -> None:
+        """Initialize the email processor."""
+        self.gmail_client = GmailClient()
+        self.ai_processor = AIProcessor()
+        self.slack_client = SlackServiceClient()
+        
+    def process_email(self, email_id: str) -> bool:
+        """Process a single email.
+        
+        Args:
+            email_id: The ID of the email to process
+            
+        Returns:
+            bool: True if processing was successful, False otherwise
+        """
+        return process_new_email(email_id)
+        
+    def on_new_email(self, history_id: str) -> None:
+        """Handle a new email notification from PubSub.
+        
+        Args:
+            history_id: The history ID from the notification
+        """
+        if not self.gmail_client:
+            logger.error("Gmail client is not initialized.")
+            return
+            
+        try:
+            # Get history records
+            history_response = self.gmail_client.get_history(history_id)
+            if not history_response:
+                logger.warning(f"No history found for history ID: {history_id}")
+                return
+                
+            # Extract message IDs from history
+            message_ids = []
+            for history_record in history_response.get('history', []):
+                for msg_added in history_record.get('messagesAdded', []):
+                    msg_id = msg_added.get('message', {}).get('id')
+                    if msg_id:
+                        message_ids.append(msg_id)
+                        
+            # Process each message
+            for msg_id in message_ids:
+                self.process_email(msg_id)
+                
+        except Exception as e:
+            logger.error(f"Error processing history {history_id}: {e}")
+
 class EmailTriageApp:
     """Orchestrates the email triage workflow."""
 

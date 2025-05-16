@@ -127,6 +127,10 @@ class TestGmailClient:
             mock_creds.from_authorized_user_file.return_value = MagicMock(valid=True)
             client = GmailClient()
             
+            # Reset mocks to clear initialization calls
+            mock_gmail_service.reset_mock()
+            mock_gmail_service.users().labels().list.reset_mock()
+            
             # Act
             label_id = client._get_or_create_label(GMAIL_LABEL_URGENT)
             
@@ -233,21 +237,38 @@ class TestGmailClient:
         """Test setting up push notifications."""
         # Arrange
         mock_build.return_value = mock_gmail_service
-        mock_gmail_service.users().watch().execute.return_value = {
+        mock_watch_response = {
             'historyId': '12345',
             'expiration': str(int(datetime.now(timezone.utc).timestamp() * 1000) + 60*60*1000)  # 1 hour from now
         }
+        mock_gmail_service.users().watch().execute.return_value = mock_watch_response
         
         with patch('os.path.exists', return_value=True), \
              patch('src.gmail_service.gmail_client.Credentials') as mock_creds:
             mock_creds.from_authorized_user_file.return_value = MagicMock(valid=True)
             client = GmailClient()
             
+            # Mock the label_id to avoid get_or_create_label calls
+            client.urgent_label_id = 'mock_label_id'
+            
+            # Reset mocks
+            mock_gmail_service.reset_mock()
+            mock_gmail_service.users().watch.reset_mock()
+            
             # Act
             result = client.setup_push_notifications()
             
             # Assert
             assert result is True
+            
+            # Verify watch was called with correct parameters
+            assert mock_gmail_service.users().watch.call_count > 0
+            
+            # Verify request body
+            watch_call_args = mock_gmail_service.users().watch.call_args_list[0]
+            assert 'userId' in watch_call_args[1]
+            assert watch_call_args[1]['userId'] == 'me'
+            
             mock_gmail_service.users().watch.assert_called_once()
             expected_topic_name = f"projects/{os.environ['GOOGLE_CLOUD_PROJECT_ID']}/topics/{os.environ['GOOGLE_PUBSUB_TOPIC_ID']}"
             watch_request = mock_gmail_service.users().watch.call_args[1]['body']

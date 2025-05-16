@@ -2,10 +2,39 @@
 import os
 import json
 import pytest
+import sys
 from datetime import datetime
 from unittest.mock import MagicMock, patch
+import base64
 
 from src.core.types import EmailData, AnalyzedEmailData
+
+
+# Mock Google Cloud Pub/Sub package before imports
+class MockTypes:
+    """Mock types for Google Cloud Pub/Sub."""
+    class ReceivedMessage:
+        """Mock ReceivedMessage class."""
+        pass
+
+
+class MockPubSub:
+    """Mock class for Google Cloud Pub/Sub."""
+    SubscriberClient = MagicMock
+    PublisherClient = MagicMock
+    types = MockTypes
+
+
+# Create module structure for google.cloud.pubsub_v1
+class MockGoogleCloud:
+    """Mock class for Google Cloud."""
+    pubsub_v1 = MockPubSub()
+
+
+# Add to sys.modules to mock the imports
+sys.modules['google.cloud'] = MockGoogleCloud()
+sys.modules['google.cloud.pubsub_v1'] = MockPubSub()
+sys.modules['google.cloud.pubsub_v1.types'] = MockTypes()
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -21,6 +50,26 @@ def mock_env_variables():
     os.environ["LOG_LEVEL"] = "DEBUG"
     yield
     # No need to clean up - environment variables are process-scoped
+
+
+@pytest.fixture(scope="session", autouse=True)
+def mock_transformers_pipeline():
+    """Mock the transformers pipeline to avoid loading the actual models."""
+    with patch('transformers.pipeline') as mock_pipeline:
+        def pipeline_side_effect(task, model=None):
+            pipeline_mock = MagicMock()
+            if task == "sentiment-analysis":
+                # Configure the mock to return a positive sentiment by default
+                pipeline_mock.return_value = [{"label": "POSITIVE", "score": 0.95}]
+            elif task == "summarization":
+                # Configure the mock to return a simple summary
+                pipeline_mock.return_value = [{"summary_text": "This is a summary of the email."}]
+            else:
+                pipeline_mock.return_value = []
+            return pipeline_mock
+        
+        mock_pipeline.side_effect = pipeline_side_effect
+        yield mock_pipeline
 
 
 @pytest.fixture
@@ -148,4 +197,29 @@ def mock_gmail_client(mock_gmail_service, mock_history_response):
             # Configure common mock methods
             client.get_history = MagicMock(return_value=mock_history_response)
             
-            yield client 
+            yield client
+
+
+@pytest.fixture
+def mock_pubsub_message():
+    """Create a mock Pub/Sub message."""
+    # Create message data (simulating Gmail notification)
+    data = {
+        'emailAddress': 'user@example.com',
+        'historyId': '12345'
+    }
+    json_data = json.dumps(data)
+    encoded_data = base64.b64encode(json_data.encode('utf-8'))
+    
+    # Create mock message
+    message = MagicMock()
+    message.message_id = 'test-message-id'
+    message.data = MagicMock(spec=bytes)
+    
+    # Configure the decode method
+    message.data.decode.return_value = json_data
+    
+    message.ack = MagicMock()
+    message.nack = MagicMock()
+    
+    return message 

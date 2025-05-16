@@ -1,27 +1,31 @@
 import logging
 import sys
-from src.core.config import LOG_LEVEL
+from importlib import import_module
 
 def get_logger(name: str) -> logging.Logger:
-    """Configures and returns a logger instance."""
+    """Return a configured logger instance.
+
+    The logger level is determined from ``src.core.config.LOG_LEVEL`` each time this
+    function is called so that test suites can monkey-patch the value at runtime
+    (e.g. ``patch('src.core.config.LOG_LEVEL', 'DEBUG')``).  This avoids the value
+    being frozen at import time, which previously prevented the log level from
+    updating in tests.
+    """
     logger = logging.getLogger(name)
-    logger.setLevel(LOG_LEVEL)
 
-    # Create handlers
-    stdout_handler = logging.StreamHandler(sys.stdout)
-    # You could also add a FileHandler here if you want to log to a file
-    # file_handler = logging.FileHandler('app.log')
+    # Dynamically import the config module to pick up any runtime monkey-patches
+    core_config = import_module('src.core.config')
+    level_name = getattr(core_config, 'LOG_LEVEL', 'INFO').upper()
+    level = getattr(logging, level_name, logging.INFO)
 
-    # Create formatters and add it to handlers
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    stdout_handler.setFormatter(formatter)
-    # file_handler.setFormatter(formatter)
+    logger.setLevel(level)
 
-    # Add handlers to the logger
-    # Avoid adding handlers multiple times if the logger is already configured
+    # Do not add multiple handlers in repeated calls
     if not logger.handlers:
+        stdout_handler = logging.StreamHandler(sys.stdout)
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        stdout_handler.setFormatter(formatter)
         logger.addHandler(stdout_handler)
-        # logger.addHandler(file_handler)
 
     return logger
 

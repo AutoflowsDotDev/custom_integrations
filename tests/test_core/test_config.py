@@ -58,7 +58,11 @@ def test_validate_config_success():
 @patch.dict(os.environ, {"SLACK_BOT_TOKEN": ""}, clear=False)
 def test_validate_config_missing_required():
     """Test configuration validation with a missing required variable."""
-    with pytest.raises(ConfigError) as excinfo:
-        validate_config()
-    
-    assert "Missing required configuration: SLACK_BOT_TOKEN" in str(excinfo.value) 
+    # Patch the SLACK_BOT_TOKEN environment variable to be empty
+    # and also update the global SLACK_BOT_TOKEN in the config module
+    # Otherwise, it will already have the default value from the config initialization
+    with patch('src.core.config.SLACK_BOT_TOKEN', ''):
+        with pytest.raises(ConfigError) as excinfo:
+            validate_config()
+        
+        assert "Missing required configuration: SLACK_BOT_TOKEN" in str(excinfo.value) 

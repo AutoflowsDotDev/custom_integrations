@@ -1,5 +1,6 @@
 import os.path
 import base64
+from datetime import datetime, timezone
 from typing import Optional, List, Any, Dict
 
 from google.auth.transport.requests import Request
@@ -108,7 +109,7 @@ class GmailClient:
             logger.info(f"Label '{label_name}' created with ID: {created_label['id']}")
             return created_label['id']
         except HttpError as error:
-            logger.error(f'An API error occurred while getting/creating label '{label_name}': {error}')
+            logger.error(f"An API error occurred while getting/creating label '{label_name}': {error}")
             return None
         except Exception as e:
             logger.error(f"Unexpected error with label '{label_name}': {e}")
@@ -140,7 +141,6 @@ class GmailClient:
                     date_str = header.get('value')
             
             # Parse date string to datetime object (simplified, robust parsing might be needed)
-            from datetime import datetime, timezone
             try:
                 # Example: "Wed, 5 Jun 2024 10:30:00 +0000 (UTC)" or similar
                 # This parsing is basic. For robustness, consider `dateutil.parser`
@@ -277,6 +277,34 @@ class GmailClient:
         except Exception as e:
             logger.error(f"An unexpected error occurred while stopping push notifications: {e}")
             return False
+
+    def get_history(self, history_id: str) -> Optional[Dict[str, Any]]:
+        """Get email history starting from the specified history ID.
+        
+        Args:
+            history_id: The ID to start the history from
+            
+        Returns:
+            A dictionary containing the history information, or None if an error occurred
+        """
+        if not self.service:
+            logger.error("Gmail service not initialized. Cannot get history.")
+            return None
+            
+        try:
+            history_response = self.service.users().history().list(
+                userId=GMAIL_USER_ID,
+                startHistoryId=history_id,
+                historyTypes=['messageAdded']
+            ).execute()
+            
+            return history_response
+        except HttpError as error:
+            logger.error(f"An API error occurred while getting history for ID {history_id}: {error}")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error getting history for ID {history_id}: {e}")
+            return None
 
 # Example Usage (for testing purposes)
 if __name__ == '__main__':

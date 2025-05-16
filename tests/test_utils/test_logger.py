@@ -23,12 +23,15 @@ def test_get_logger_configures_level():
     # Arrange
     logger_name = "test_logger_level"
     
-    # Act
-    logger = get_logger(logger_name)
-    
-    # Assert
-    # Should be set to DEBUG from our mock environment variable
-    assert logger.level == logging.DEBUG
+    # Patch the LOG_LEVEL in the config module
+    with patch('src.core.config.LOG_LEVEL', 'DEBUG'):
+        
+        # Act
+        logger = get_logger(logger_name)
+        
+        # Assert
+        # Should be set to DEBUG from our patched value
+        assert logger.level == logging.DEBUG
 
 
 def test_get_logger_adds_handler_once():
