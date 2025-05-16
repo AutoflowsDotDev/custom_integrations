@@ -96,7 +96,8 @@ class TestGmailClient:
         # Arrange
         mock_build.return_value = mock_gmail_service
         
-        with patch('os.path.exists', side_effect=[False, True]), \
+        # First False for service account, then False for credentials, then True for client secrets
+        with patch('os.path.exists', side_effect=[False, False, True]), \
              patch('src.gmail_service.gmail_client.InstalledAppFlow') as mock_flow, \
              patch('builtins.open', mock_open()) as mock_file:
             mock_flow_instance = MagicMock()
@@ -110,6 +111,27 @@ class TestGmailClient:
             mock_flow.from_client_secrets_file.assert_called_once()
             mock_flow_instance.run_local_server.assert_called_once()
             mock_file().write.assert_called_once_with('{"token": "test"}')
+
+    def test_init_service_account(self, mock_build, mock_gmail_service):
+        """Test initialization using service account authentication."""
+        # Arrange
+        mock_build.return_value = mock_gmail_service
+        
+        with patch('os.path.exists', return_value=True), \
+             patch('src.gmail_service.gmail_client.service_account.Credentials') as mock_sa_creds:
+            # Setup service account mock
+            mock_sa_creds.from_service_account_file.return_value = MagicMock()
+            mock_sa_creds.from_service_account_file.return_value.with_subject.return_value = MagicMock()
+            
+            # Act
+            client = GmailClient()
+            
+            # Assert
+            assert client.service is not None
+            assert client.service == mock_gmail_service
+            mock_sa_creds.from_service_account_file.assert_called_once()
+            mock_sa_creds.from_service_account_file.return_value.with_subject.assert_called_once_with(GMAIL_USER_ID)
+            mock_build.assert_called_once()
 
     def test_get_or_create_label_existing(self, mock_build, mock_gmail_service):
         """Test getting an existing label."""

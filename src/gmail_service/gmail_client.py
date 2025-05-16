@@ -5,6 +5,7 @@ from typing import Optional, List, Any, Dict
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
+from google.oauth2 import service_account
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build, Resource
 from googleapiclient.errors import HttpError
@@ -12,6 +13,7 @@ from googleapiclient.errors import HttpError
 from src.core.config import (
     GOOGLE_CLIENT_SECRETS_JSON_PATH,
     GOOGLE_CREDENTIALS_JSON_PATH,
+    GOOGLE_SERVICE_ACCOUNT_PATH,
     GMAIL_USER_ID,
     GMAIL_LABEL_URGENT,
     GOOGLE_PUBSUB_TOPIC_ID,
@@ -32,13 +34,43 @@ SCOPES = [
 class GmailClient:
     """Handles interactions with the Gmail API."""
     def __init__(self) -> None:
-        self.service: Optional[Resource] = self._get_gmail_service()
+        # Check for service account first, otherwise fall back to OAuth
+        self.service: Optional[Resource] = self._get_service_account_gmail_service() or self._get_oauth_gmail_service()
         self.urgent_label_id: Optional[str] = None
         if self.service:
             self.urgent_label_id = self._get_or_create_label(GMAIL_LABEL_URGENT)
 
-    def _get_gmail_service(self) -> Optional[Resource]:
-        """Authenticates and returns the Gmail API service client."""
+    def _get_service_account_gmail_service(self) -> Optional[Resource]:
+        """Authenticates using a service account and returns the Gmail API service client.
+        This is the recommended approach for server deployments.
+        """
+        if not os.path.exists(GOOGLE_SERVICE_ACCOUNT_PATH):
+            logger.info(f"Service account file not found at: {GOOGLE_SERVICE_ACCOUNT_PATH}. Will try OAuth flow.")
+            return None
+
+        try:
+            # Create credentials for delegated user using service account
+            credentials = service_account.Credentials.from_service_account_file(
+                GOOGLE_SERVICE_ACCOUNT_PATH,
+                scopes=SCOPES
+            )
+            
+            # Important: The service account must have domain-wide delegation enabled
+            # and be granted access to impersonate users in your organization
+            delegated_credentials = credentials.with_subject(GMAIL_USER_ID)
+            
+            # Build the Gmail service
+            service = build('gmail', 'v1', credentials=delegated_credentials)
+            logger.info("Gmail API service built successfully using service account authentication.")
+            return service
+        except Exception as e:
+            logger.error(f"Error authenticating with service account: {e}")
+            return None
+
+    def _get_oauth_gmail_service(self) -> Optional[Resource]:
+        """Authenticates using OAuth user flow and returns the Gmail API service client.
+        This is less secure for server deployments but useful for desktop applications.
+        """
         creds = None
         if os.path.exists(GOOGLE_CREDENTIALS_JSON_PATH):
             try:

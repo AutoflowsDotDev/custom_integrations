@@ -22,6 +22,7 @@ def get_env_variable(var_name: str, default: Optional[str] = None) -> Optional[s
 # Gmail API Configuration
 GOOGLE_CLIENT_SECRETS_JSON_PATH: str = get_env_variable("GOOGLE_CLIENT_SECRETS_JSON_PATH", "dummy/path/client_secret.json")
 GOOGLE_CREDENTIALS_JSON_PATH: str = get_env_variable("GOOGLE_CREDENTIALS_JSON_PATH", "dummy/path/credentials.json")
+GOOGLE_SERVICE_ACCOUNT_PATH: str = get_env_variable("GOOGLE_SERVICE_ACCOUNT_PATH", "dummy/path/service_account.json")
 GMAIL_USER_ID: str = get_env_variable("GMAIL_USER_ID", "me")
 GMAIL_LABEL_URGENT: str = get_env_variable("GMAIL_LABEL_URGENT", "URGENT_AI")
 
@@ -46,6 +47,7 @@ def validate_config() -> None:
     required_vars = [
         "GOOGLE_CLIENT_SECRETS_JSON_PATH",
         "GOOGLE_CREDENTIALS_JSON_PATH",
+        "GOOGLE_SERVICE_ACCOUNT_PATH",
         "GOOGLE_CLOUD_PROJECT_ID",
         "GOOGLE_PUBSUB_TOPIC_ID",
         "GOOGLE_PUBSUB_SUBSCRIPTION_ID",
