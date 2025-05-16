@@ -1,0 +1,15 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+<review_scan>
+    Do a full security, code quality scan of project.
+
+    Also do an impact/severity review and list major impacts of project. 
+    i.e. does the script deleting entire databases, make major updates...
+    list changes in terms of severity with details (Criticial, severe, major, minor...) 
+    
+    Create seperate final report files each for security, code smells and severity analyses.
+
+</review_scan>
