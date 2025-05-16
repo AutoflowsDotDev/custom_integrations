@@ -23,4 +23,14 @@ alwaysApply: false
 • Implement log rotation for production environments
 </logging>
 
+<monitoring>
+This automation workflow will need to be monitored through a dashboarding tool like datadog or grafana.
 
+Thus, for every workflow execuction, append an execution/run number which can easily be parsed, so all the logs for that run can be easily grouped. also label and number each step in the workflow accordingly.
+
+ie. an example log so you can see what im talking about
+
+info - jan 12, 2024 14:45:23 -  run: 245, step:1-fetching emails ...
+info - jan 12, 2024 14:45:52 -  run: 245, step:3-summarizing emails ...
+
+</monitoring>
