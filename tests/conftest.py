@@ -58,9 +58,9 @@ def mock_transformers_pipeline():
     with patch('transformers.pipeline') as mock_pipeline:
         def pipeline_side_effect(task, model=None):
             pipeline_mock = MagicMock()
-            if task == "sentiment-analysis":
-                # Configure the mock to return a positive sentiment by default
-                pipeline_mock.return_value = [{"label": "POSITIVE", "score": 0.95}]
+            if task == "text-classification":
+                # Configure the mock to return a non-urgent classification by default
+                pipeline_mock.return_value = [{"label": "NOT_URGENT", "score": 0.80}]
             elif task == "summarization":
                 # Configure the mock to return a simple summary
                 pipeline_mock.return_value = [{"summary_text": "This is a summary of the email."}]

@@ -232,8 +232,12 @@ class GmailClient:
             logger.error("Gmail service not initialized. Cannot set up push notifications.")
             return False
         
-        # Construct the full topic name
-        topic_name = f"projects/{GOOGLE_CLOUD_PROJECT_ID}/topics/{GOOGLE_PUBSUB_TOPIC_ID}"
+        # Construct the full topic name – fetch the *current* environment variables
+        # in case they have been altered at runtime (e.g., within unit tests).
+        project_id = os.getenv("GOOGLE_CLOUD_PROJECT_ID", GOOGLE_CLOUD_PROJECT_ID)
+        topic_id = os.getenv("GOOGLE_PUBSUB_TOPIC_ID", GOOGLE_PUBSUB_TOPIC_ID)
+
+        topic_name = f"projects/{project_id}/topics/{topic_id}"
         
         watch_request = {
             'labelIds': ['INBOX'],  # Only watch for new emails in the INBOX

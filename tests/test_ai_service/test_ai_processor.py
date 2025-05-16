@@ -13,10 +13,10 @@ def mock_pipeline():
     """Create a mock transformers pipeline."""
     pipeline_mock = MagicMock()
     
-    # Configure sentiment analysis (urgency) output
+    # Configure text-classification (urgency) output
     pipeline_mock.return_value.side_effect = None
     pipeline_mock.return_value.return_value = [
-        {"label": "POSITIVE", "score": 0.95}  # High confidence positive sentiment
+        {"label": "URGENT", "score": 0.95}  # High confidence urgent classification
     ]
     
     return pipeline_mock
@@ -44,7 +44,7 @@ class TestAIProcessor:
         
         # Configure pipeline to return different instances based on task
         def pipeline_side_effect(task, model):
-            if task == "sentiment-analysis":
+            if task == "text-classification":
                 return urgency_pipeline_mock
             elif task == "summarization":
                 return summarization_pipeline_mock
@@ -61,7 +61,7 @@ class TestAIProcessor:
         
         # Check that pipeline was called with expected arguments
         assert mock_pipeline_func.call_count == 2
-        mock_pipeline_func.assert_any_call("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
+        mock_pipeline_func.assert_any_call("text-classification", model="finityai/email-urgency-classifier")
         mock_pipeline_func.assert_any_call("summarization", model="facebook/bart-large-cnn")
 
     @patch('src.ai_service.ai_processor.pipeline')
@@ -70,7 +70,7 @@ class TestAIProcessor:
         # Arrange
         # Fail only on urgency pipeline
         def pipeline_side_effect(task, model):
-            if task == "sentiment-analysis":
+            if task == "text-classification":
                 raise Exception("Failed to load urgency model")
             return MagicMock()
         
@@ -130,9 +130,9 @@ class TestAIProcessor:
         """Test urgency analysis with positive result."""
         # Arrange - Configure mock pipeline
         urgency_pipeline = MagicMock()
-        urgency_pipeline.return_value = [{"label": "POSITIVE", "score": 0.95}]
+        urgency_pipeline.return_value = [{"label": "URGENT", "score": 0.95}]
         
-        mock_pipeline_func.side_effect = lambda task, model: urgency_pipeline if task == "sentiment-analysis" else MagicMock()
+        mock_pipeline_func.side_effect = lambda task, model: urgency_pipeline if task == "text-classification" else MagicMock()
         
         ai_processor = AIProcessor()
         
@@ -148,9 +148,9 @@ class TestAIProcessor:
         """Test urgency analysis with negative result."""
         # Arrange - Configure mock pipeline
         urgency_pipeline = MagicMock()
-        urgency_pipeline.return_value = [{"label": "NEGATIVE", "score": 0.85}]
+        urgency_pipeline.return_value = [{"label": "NOT_URGENT", "score": 0.85}]
         
-        mock_pipeline_func.side_effect = lambda task, model: urgency_pipeline if task == "sentiment-analysis" else MagicMock()
+        mock_pipeline_func.side_effect = lambda task, model: urgency_pipeline if task == "text-classification" else MagicMock()
         
         ai_processor = AIProcessor()
         
@@ -166,9 +166,9 @@ class TestAIProcessor:
         """Test urgency detection using keywords."""
         # Arrange - Configure mock pipeline to return non-urgent by sentiment
         urgency_pipeline = MagicMock()
-        urgency_pipeline.return_value = [{"label": "NEGATIVE", "score": 0.75}]
+        urgency_pipeline.return_value = [{"label": "NOT_URGENT", "score": 0.75}]
         
-        mock_pipeline_func.side_effect = lambda task, model: urgency_pipeline if task == "sentiment-analysis" else MagicMock()
+        mock_pipeline_func.side_effect = lambda task, model: urgency_pipeline if task == "text-classification" else MagicMock()
         
         ai_processor = AIProcessor()
         
@@ -185,7 +185,7 @@ class TestAIProcessor:
         urgency_pipeline = MagicMock()
         urgency_pipeline.side_effect = Exception("Model failed")
         
-        mock_pipeline_func.side_effect = lambda task, model: urgency_pipeline if task == "sentiment-analysis" else MagicMock()
+        mock_pipeline_func.side_effect = lambda task, model: urgency_pipeline if task == "text-classification" else MagicMock()
         
         ai_processor = AIProcessor()
         
@@ -195,9 +195,9 @@ class TestAIProcessor:
             
             # Assert
             assert result["is_urgent"] is False
-            assert result["confidence_score"] is None
+            assert result["confidence_score"] == 0.0
             mock_error.assert_called_once()
-            assert "Error during urgency analysis" in mock_error.call_args[0][0]
+            assert "Error during ML urgency analysis" in mock_error.call_args[0][0]
 
     @patch('src.ai_service.ai_processor.pipeline')
     def test_summarize_email(self, mock_pipeline_func):
@@ -264,13 +264,13 @@ class TestAIProcessor:
         """Test processing an urgent email."""
         # Arrange - Configure mock pipeline
         urgency_pipeline = MagicMock()
-        urgency_pipeline.return_value = [{"label": "POSITIVE", "score": 0.95}]
+        urgency_pipeline.return_value = [{"label": "URGENT", "score": 0.95}]
         
         summary_pipeline = MagicMock()
         summary_pipeline.return_value = [{"summary_text": "Urgent matter requiring attention."}]
         
         def pipeline_side_effect(task, model):
-            if task == "sentiment-analysis":
+            if task == "text-classification":
                 return urgency_pipeline
             elif task == "summarization":
                 return summary_pipeline
@@ -300,13 +300,13 @@ class TestAIProcessor:
         """Test processing a non-urgent email."""
         # Arrange
         urgency_pipeline = MagicMock()
-        urgency_pipeline.return_value = [{"label": "NEGATIVE", "score": 0.85}]
+        urgency_pipeline.return_value = [{"label": "NOT_URGENT", "score": 0.85}]
         
         summary_pipeline = MagicMock()
         # This should not be called for non-urgent emails in our current design
         
         def pipeline_side_effect(task, model):
-            if task == "sentiment-analysis":
+            if task == "text-classification":
                 return urgency_pipeline
             elif task == "summarization":
                 return summary_pipeline
