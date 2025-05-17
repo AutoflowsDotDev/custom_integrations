@@ -1,12 +1,9 @@
 import os
 from dotenv import load_dotenv
 from typing import Optional
+from src.utils.exceptions import ConfigError
 
 load_dotenv()
-
-class ConfigError(Exception):
-    """Custom exception for configuration errors."""
-    pass
 
 def get_env_variable(var_name: str, default: Optional[str] = None) -> Optional[str]:
     """Gets an environment variable or returns a default value.
