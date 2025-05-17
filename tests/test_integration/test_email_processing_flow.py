@@ -18,8 +18,6 @@ from tests.mocks.data import (
     EMPTY_FIELDS_EMAIL, MALICIOUS_EMAIL, STANDARD_RECEIVED_MESSAGE
 )
 
-pytestmark = pytest.mark.asyncio
-
 @pytest.mark.usefixtures("mock_environment")
 class TestEmailProcessingFlow:
     """Tests for the end-to-end email processing flow."""

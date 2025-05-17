@@ -245,7 +245,7 @@ API_ERROR_RESPONSE = {
     "error": {
         "message": "The API key provided is invalid or has expired.",
         "type": "invalid_request_error",
-        "param": null,
+        "param": None,
         "code": "invalid_api_key"
     }
 }
@@ -254,7 +254,7 @@ RATE_LIMIT_ERROR_RESPONSE = {
     "error": {
         "message": "Rate limit exceeded. Please try again later.",
         "type": "rate_limit_error",
-        "param": null,
+        "param": None,
         "code": "rate_limit_exceeded"
     }
 }
@@ -263,7 +263,7 @@ MODEL_OVERLOADED_ERROR_RESPONSE = {
     "error": {
         "message": "The model is currently overloaded. Please try again later.",
         "type": "server_error",
-        "param": null,
+        "param": None,
         "code": "model_overloaded"
     }
 }

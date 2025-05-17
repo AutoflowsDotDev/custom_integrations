@@ -243,7 +243,11 @@ class AIProcessor:
             # Optionally, summarize non-urgent emails too, or have a shorter summary
             # For now, only summarizing urgent ones as per diagram (implicitly)
             logger.info(f"Email ID {email_data.get('id')} is not urgent. Skipping detailed summarization.")
-            summary = email_data.get('snippet', 'No summary available.')[:150] # Use snippet for non-urgent
+            snippet = email_data.get('snippet')
+            if snippet is not None:
+                summary = snippet[:150]  # Use snippet for non-urgent
+            else:
+                summary = "No summary available."
 
         analyzed_data: AnalyzedEmailData = {
             **email_data, # type: ignore - spread EmailData fields

@@ -22,8 +22,6 @@ from tests.mocks.data import (
 from src.gmail_service.pubsub_listener import PubSubListener
 from src.utils.exceptions import PubSubError
 
-pytestmark = pytest.mark.asyncio
-
 @pytest.mark.usefixtures("mock_environment")
 class TestPubSubListener:
     """Tests for the PubSub listener component."""

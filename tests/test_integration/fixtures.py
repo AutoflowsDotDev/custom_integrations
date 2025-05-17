@@ -144,7 +144,7 @@ def mock_gmail_service():
 def mock_gmail_client(mock_gmail_service):
     """Create a mock GmailClient with integrated service mock."""
     # Mock the file existence check and Credentials
-    with patch('os.path.exists', return_value=True), \
+    with patch('os.path.exists', return_value=False), \
          patch('src.gmail_service.gmail_client.Credentials') as mock_creds, \
          patch('src.gmail_service.gmail_client.build', return_value=mock_gmail_service):
         
@@ -273,11 +273,11 @@ def mock_ai_processor():
             if any(kw in email_text_lower for kw in ['urgent', 'asap', 'immediately', 'critical', 'action required']):
                 return {"is_urgent": True, "confidence_score": 0.92}
             elif "borderline" in email_text_lower:
-                return {"is_urgent": False, "confidence_score": 0.55}
+                return {"is_urgent": False, "confidence_score": 0.55}  # Low confidence for borderline
             elif "implicit" in email_text_lower and "error rate" in email_text_lower:
-                return {"is_urgent": True, "confidence_score": 0.75}
+                return {"is_urgent": True, "confidence_score": 0.75}  # Implicit urgency detected as urgent
             elif "misleading" in email_text_lower and "urgent care" in email_text_lower:
-                return {"is_urgent": False, "confidence_score": 0.82}
+                return {"is_urgent": False, "confidence_score": 0.82}  # Not urgent despite "urgent" keyword
             else:
                 return {"is_urgent": False, "confidence_score": 0.87}
                 
