@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Depends, Response
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
     Counter,
@@ -7,7 +7,7 @@ from prometheus_client import (
     generate_latest
 )
 
-router = APIRouter(tags=["metrics"])
+from src.api.dependencies import get_api_key
 
 # Define metrics
 EMAILS_PROCESSED = Counter(
@@ -18,8 +18,8 @@ EMAILS_PROCESSED = Counter(
 
 EMAIL_PROCESSING_TIME = Histogram(
     "email_processing_seconds",
-    "Time spent processing emails",
-    buckets=[0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0]
+    "Time taken to process emails",
+    buckets=(0.1, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0, float('inf'))
 )
 
 GMAIL_REQUESTS = Counter(
@@ -42,12 +42,16 @@ AI_REQUESTS = Counter(
 
 ACTIVE_CONNECTIONS = Gauge(
     "active_connections",
-    "Number of active connections"
+    "Number of active connections to the API"
 )
 
-@router.get("/metrics")
-async def metrics():
-    """
-    Expose Prometheus metrics.
-    """
-    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST) 
+router = APIRouter(
+    prefix="/metrics",
+    tags=["metrics"],
+    dependencies=[Depends(get_api_key)]
+)
+
+@router.get("", summary="Get Prometheus metrics")
+async def get_metrics():
+    """Return Prometheus metrics."""
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST) 

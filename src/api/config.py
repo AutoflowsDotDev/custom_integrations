@@ -20,14 +20,16 @@ class APISettings(BaseSettings):
     
     # Security settings
     API_KEY_NAME: str = "X-API-KEY"
-    API_KEY: Optional[str] = os.getenv("API_KEY")
+    API_KEY: Optional[str] = None
     
     # Monitoring settings
     ENABLE_METRICS: bool = True
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    model_config = {
+        "env_file": ".env",
+        "case_sensitive": True,
+        "extra": "ignore"  # Ignore extra fields
+    }
 
 @lru_cache()
 def get_api_settings() -> APISettings:

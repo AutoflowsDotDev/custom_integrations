@@ -29,11 +29,17 @@ def test_health_check(test_client):
     ai_mock = MagicMock()
     slack_mock = MagicMock()
     
-    # Mock the API dependency functions
-    with patch('src.api.dependencies.get_api_key', return_value="test-api-key"), \
+    # Mock the API dependency functions and client initialization
+    with patch('src.gmail_service.gmail_client.GmailClient.__init__', return_value=None), \
+         patch('src.ai_service.ai_processor.AIProcessor.__init__', return_value=None), \
+         patch('src.slack_service.slack_client.SlackServiceClient.__init__', return_value=None), \
+         patch('src.api.dependencies.get_api_key', return_value="test-api-key"), \
          patch('src.api.dependencies.get_gmail_client', return_value=gmail_mock), \
          patch('src.api.dependencies.get_ai_processor', return_value=ai_mock), \
-         patch('src.api.dependencies.get_slack_client', return_value=slack_mock):
+         patch('src.api.dependencies.get_slack_client', return_value=slack_mock), \
+         patch('src.api.routers.health.get_gmail_client', return_value=gmail_mock), \
+         patch('src.api.routers.health.get_ai_processor', return_value=ai_mock), \
+         patch('src.api.routers.health.get_slack_client', return_value=slack_mock):
         
         response = test_client.get("/api/v1/health")
         

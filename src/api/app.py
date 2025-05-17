@@ -24,7 +24,8 @@ def create_app() -> FastAPI:
         validate_config()
     except Exception as e:
         logger.critical(f"Configuration validation error: {e}")
-        raise
+        # Ensure we re-raise the exception for proper error handling
+        raise Exception(f"Configuration error: {str(e)}")
 
     app = FastAPI(
         title=api_settings.PROJECT_NAME,
@@ -49,12 +50,14 @@ def create_app() -> FastAPI:
     async def connection_middleware(request, call_next):
         ACTIVE_CONNECTIONS.inc()
         start_time = time.time()
+        response = None
         try:
             response = await call_next(request)
             return response
         finally:
             process_time = time.time() - start_time
-            response.headers["X-Process-Time"] = str(process_time)
+            if response is not None:
+                response.headers["X-Process-Time"] = str(process_time)
             ACTIVE_CONNECTIONS.dec()
 
     # Custom OpenAPI and docs endpoints with API key protection if enabled

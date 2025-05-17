@@ -106,10 +106,17 @@ def test_process_email_endpoint_regular(test_client, mock_process_email_success)
     """Test processing a regular (non-urgent) email."""
     gmail_client, ai_processor, slack_client = mock_process_email_success
     
-    with patch('src.api.dependencies.get_api_key', return_value="test-api-key"), \
+    # Mock everything needed for this test to avoid service account errors
+    with patch('src.gmail_service.gmail_client.GmailClient.__init__', return_value=None), \
+         patch('src.ai_service.ai_processor.AIProcessor.__init__', return_value=None), \
+         patch('src.slack_service.slack_client.SlackServiceClient.__init__', return_value=None), \
+         patch('src.api.dependencies.get_api_key', return_value="test-api-key"), \
          patch('src.api.dependencies.get_gmail_client', return_value=gmail_client), \
          patch('src.api.dependencies.get_ai_processor', return_value=ai_processor), \
-         patch('src.api.dependencies.get_slack_client', return_value=slack_client):
+         patch('src.api.dependencies.get_slack_client', return_value=slack_client), \
+         patch('src.api.routers.email.get_gmail_client', return_value=gmail_client), \
+         patch('src.api.routers.email.get_ai_processor', return_value=ai_processor), \
+         patch('src.api.routers.email.get_slack_client', return_value=slack_client):
         
         response = test_client.post(
             "/api/v1/emails/process",

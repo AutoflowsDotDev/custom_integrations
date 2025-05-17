@@ -38,10 +38,17 @@ def test_app_creation():
 
 def test_app_creation_with_error():
     """Test that app creation handles errors correctly."""
-    with patch('src.core.config.validate_config', side_effect=Exception("Test error")), \
-         pytest.raises(Exception) as excinfo:
-        create_app()
-    assert "Test error" in str(excinfo.value)
+    def mock_validate_config():
+        # Directly raise an exception instead of using side_effect
+        raise Exception("Test error")
+        
+    with patch('src.core.config.validate_config', new=mock_validate_config):
+        # Test that an exception is raised from create_app
+        with pytest.raises(Exception) as excinfo:
+            create_app()
+        
+        # Check that the error message contains our test message
+        assert "Test error" in str(excinfo.value)
 
 
 def test_root_endpoint(test_client):

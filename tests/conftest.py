@@ -62,8 +62,26 @@ def mock_env_variables():
 @pytest.fixture(scope="session", autouse=True)
 def mock_service_files():
     """Mock the existence of service account files."""
-    with patch('os.path.exists', return_value=True), \
-         patch('builtins.open', MagicMock()), \
+    # Create a more specific mock for file existence
+    original_exists = os.path.exists
+    
+    def mock_exists(path):
+        # Return True for service account files mentioned in env vars or test paths
+        if (path.endswith('service_account.json') or 
+            path.endswith('credentials.json') or 
+            path.endswith('client_secret.json') or
+            path in ['dummy/path/service_account.json', 'dummy/path/credentials.json', 'dummy/path/client_secret.json']):
+            return True
+        # Fall back to real implementation for other paths
+        return original_exists(path)
+    
+    # Mock for file open operations
+    mock_file = MagicMock()
+    mock_file.__enter__ = MagicMock(return_value=MagicMock(read=MagicMock(return_value='{}')))
+    mock_file.__exit__ = MagicMock(return_value=None)
+        
+    with patch('os.path.exists', mock_exists), \
+         patch('builtins.open', MagicMock(return_value=mock_file)), \
          patch('json.load', return_value={'type': 'service_account'}):
         yield
 

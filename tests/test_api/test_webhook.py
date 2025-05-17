@@ -62,11 +62,18 @@ def test_webhook_pubsub_valid(test_client, mock_pubsub_payload, mock_process_his
     # Setup AsyncMock for process_history
     async_mock = AsyncMockResponse(mock_process_history_response)
     
-    with patch('src.api.dependencies.get_api_key', return_value="test-api-key"), \
+    # Mock all dependencies to avoid service account errors
+    with patch('src.gmail_service.gmail_client.GmailClient.__init__', return_value=None), \
+         patch('src.ai_service.ai_processor.AIProcessor.__init__', return_value=None), \
+         patch('src.slack_service.slack_client.SlackServiceClient.__init__', return_value=None), \
+         patch('src.api.dependencies.get_api_key', return_value="test-api-key"), \
          patch('src.api.dependencies.get_gmail_client', return_value=MagicMock()), \
          patch('src.api.dependencies.get_ai_processor', return_value=MagicMock()), \
          patch('src.api.dependencies.get_slack_client', return_value=MagicMock()), \
-         patch('src.api.routers.webhook.process_history', new=async_mock):
+         patch('src.api.routers.webhook.process_history', new=async_mock), \
+         patch('src.api.routers.webhook.get_gmail_client', return_value=MagicMock()), \
+         patch('src.api.routers.webhook.get_ai_processor', return_value=MagicMock()), \
+         patch('src.api.routers.webhook.get_slack_client', return_value=MagicMock()):
         
         response = test_client.post(
             "/api/v1/webhook/pubsub",

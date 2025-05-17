@@ -18,7 +18,8 @@ async def get_api_key(x_api_key: str = Header(None)):
     """Validate API key."""
     if api_settings.API_KEY_NAME and api_settings.API_KEY:
         if x_api_key != api_settings.API_KEY:
-            logger.warning(f"Invalid API key attempt: {x_api_key[:5]}...")
+            log_key = "None" if x_api_key is None else x_api_key[:5] + "..."
+            logger.warning(f"Invalid API key attempt: {log_key}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid API key"
