@@ -92,8 +92,14 @@ def test_webhook_pubsub_invalid_payload(test_client):
         "subscription": "projects/test-project/subscriptions/test-subscription"
     }
     
-    # Don't mock process_history as it shouldn't be called in this case
-    with patch('src.api.dependencies.get_api_key', return_value="test-api-key"):
+    # Mock all dependencies to avoid service account errors even for validation tests
+    with patch('src.gmail_service.gmail_client.GmailClient.__init__', return_value=None), \
+         patch('src.ai_service.ai_processor.AIProcessor.__init__', return_value=None), \
+         patch('src.slack_service.slack_client.SlackServiceClient.__init__', return_value=None), \
+         patch('src.api.dependencies.get_api_key', return_value="test-api-key"), \
+         patch('src.api.dependencies.get_gmail_client', return_value=MagicMock()), \
+         patch('src.api.dependencies.get_ai_processor', return_value=MagicMock()), \
+         patch('src.api.dependencies.get_slack_client', return_value=MagicMock()):
         response = test_client.post(
             "/api/v1/webhook/pubsub",
             json=invalid_payload
@@ -101,7 +107,7 @@ def test_webhook_pubsub_invalid_payload(test_client):
         
         assert response.status_code == 400
         data = response.json()
-        assert "message" in data["detail"]
+        assert data["detail"] == "Invalid PubSub notification"
 
 
 def test_webhook_pubsub_invalid_message(test_client):
@@ -114,8 +120,14 @@ def test_webhook_pubsub_invalid_message(test_client):
         "subscription": "projects/test-project/subscriptions/test-subscription"
     }
     
-    # Don't mock process_history as it shouldn't be called in this case
-    with patch('src.api.dependencies.get_api_key', return_value="test-api-key"):
+    # Mock all dependencies
+    with patch('src.gmail_service.gmail_client.GmailClient.__init__', return_value=None), \
+         patch('src.ai_service.ai_processor.AIProcessor.__init__', return_value=None), \
+         patch('src.slack_service.slack_client.SlackServiceClient.__init__', return_value=None), \
+         patch('src.api.dependencies.get_api_key', return_value="test-api-key"), \
+         patch('src.api.dependencies.get_gmail_client', return_value=MagicMock()), \
+         patch('src.api.dependencies.get_ai_processor', return_value=MagicMock()), \
+         patch('src.api.dependencies.get_slack_client', return_value=MagicMock()):
         response = test_client.post(
             "/api/v1/webhook/pubsub",
             json=invalid_payload
@@ -123,7 +135,7 @@ def test_webhook_pubsub_invalid_message(test_client):
         
         assert response.status_code == 400
         data = response.json()
-        assert "data" in data["detail"]
+        assert data["detail"] == "Invalid PubSub message"
 
 
 def test_webhook_pubsub_invalid_data(test_client):
@@ -137,8 +149,14 @@ def test_webhook_pubsub_invalid_data(test_client):
         "subscription": "projects/test-project/subscriptions/test-subscription"
     }
     
-    # Don't mock process_history as it shouldn't be called in this case
-    with patch('src.api.dependencies.get_api_key', return_value="test-api-key"):
+    # Mock all dependencies
+    with patch('src.gmail_service.gmail_client.GmailClient.__init__', return_value=None), \
+         patch('src.ai_service.ai_processor.AIProcessor.__init__', return_value=None), \
+         patch('src.slack_service.slack_client.SlackServiceClient.__init__', return_value=None), \
+         patch('src.api.dependencies.get_api_key', return_value="test-api-key"), \
+         patch('src.api.dependencies.get_gmail_client', return_value=MagicMock()), \
+         patch('src.api.dependencies.get_ai_processor', return_value=MagicMock()), \
+         patch('src.api.dependencies.get_slack_client', return_value=MagicMock()):
         response = test_client.post(
             "/api/v1/webhook/pubsub",
             json=invalid_payload
@@ -167,8 +185,14 @@ def test_webhook_pubsub_missing_history_id(test_client):
         "subscription": "projects/test-project/subscriptions/test-subscription"
     }
     
-    # Don't mock process_history as it shouldn't be called in this case
-    with patch('src.api.dependencies.get_api_key', return_value="test-api-key"):
+    # Mock all dependencies
+    with patch('src.gmail_service.gmail_client.GmailClient.__init__', return_value=None), \
+         patch('src.ai_service.ai_processor.AIProcessor.__init__', return_value=None), \
+         patch('src.slack_service.slack_client.SlackServiceClient.__init__', return_value=None), \
+         patch('src.api.dependencies.get_api_key', return_value="test-api-key"), \
+         patch('src.api.dependencies.get_gmail_client', return_value=MagicMock()), \
+         patch('src.api.dependencies.get_ai_processor', return_value=MagicMock()), \
+         patch('src.api.dependencies.get_slack_client', return_value=MagicMock()):
         response = test_client.post(
             "/api/v1/webhook/pubsub",
             json=invalid_payload

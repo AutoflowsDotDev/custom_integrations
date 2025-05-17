@@ -38,17 +38,18 @@ def test_app_creation():
 
 def test_app_creation_with_error():
     """Test that app creation handles errors correctly."""
-    def mock_validate_config():
+    def mock_validate_config_raising():
         # Directly raise an exception instead of using side_effect
-        raise Exception("Test error")
-        
-    with patch('src.core.config.validate_config', new=mock_validate_config):
+        raise Exception("Test error from mock")
+
+    # Patch where validate_config is *used* by create_app (i.e., in the src.api.app module scope)
+    with patch('src.api.app.validate_config', new=mock_validate_config_raising):
         # Test that an exception is raised from create_app
         with pytest.raises(Exception) as excinfo:
             create_app()
         
-        # Check that the error message contains our test message
-        assert "Test error" in str(excinfo.value)
+        # Check that the error message contains our test message and the wrapper message
+        assert "Configuration error: Test error from mock" in str(excinfo.value)
 
 
 def test_root_endpoint(test_client):

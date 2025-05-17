@@ -77,12 +77,23 @@ def mock_service_files():
     
     # Mock for file open operations
     mock_file = MagicMock()
-    mock_file.__enter__ = MagicMock(return_value=MagicMock(read=MagicMock(return_value='{}')))
+    mock_file.__enter__ = MagicMock(return_value=MagicMock(read=MagicMock(return_value=json.dumps({
+        "type": "service_account",
+        "project_id": "test-project",
+        "private_key_id": "test_private_key_id",
+        "private_key": "-----BEGIN PRIVATE KEY-----\nTEST_PRIVATE_KEY\n-----END PRIVATE KEY-----\n",
+        "client_email": "test-client-email@example.com",
+        "client_id": "test_client_id",
+        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+        "token_uri": "https://oauth2.googleapis.com/token",
+        "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+        "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/test-client-email%40example.com"
+    }))))
     mock_file.__exit__ = MagicMock(return_value=None)
         
     with patch('os.path.exists', mock_exists), \
          patch('builtins.open', MagicMock(return_value=mock_file)), \
-         patch('json.load', return_value={'type': 'service_account'}):
+         patch('json.load', side_effect=lambda f: json.loads(f.read())):
         yield
 
 

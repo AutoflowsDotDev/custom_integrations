@@ -108,6 +108,8 @@ async def pubsub_push(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Missing required field: {str(e)}"
         )
+    except HTTPException as he:
+        raise he
     except Exception as e:
         logger.error(f"Unexpected error processing PubSub notification: {e}", exc_info=True)
         raise HTTPException(

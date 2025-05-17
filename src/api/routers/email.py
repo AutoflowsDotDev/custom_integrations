@@ -231,11 +231,24 @@ async def process_history(
                 EMAILS_PROCESSED.labels(status="failed", is_urgent="unknown").inc()
                 continue
         
+        response_message = f"Processed {processed_count} emails from history update"
+        if processed_count == 0 and not message_ids: # Check if no messages were even found to process
+            # If history_response was valid but yielded no new message_ids from the start
+            if history_response and not history_response.get('history'):
+                 response_message = "No new messages found in history records."
+            elif not history_response : # if get_history returned None or empty from the start
+                 response_message = "No history records found for the provided ID or no new messages."
+            # If message_ids were initially present but all failed to process, the original message is fine
+            # however, if there were no message_ids to begin with, it means no new messages.
+            elif not message_ids: # This covers the case where history was processed, but no messages were added.
+                response_message = "No new messages found to process."
+
+
         return ProcessHistoryResponse(
             success=True,
             history_id=history_id,
             processed_emails=processed_count,
-            message=f"Processed {processed_count} emails from history update"
+            message=response_message
         )
     
     except GmailAPIError as e:

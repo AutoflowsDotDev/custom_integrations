@@ -29,14 +29,13 @@ def mock_api_key():
         yield "test-api-key"
 
 
-def test_metrics_endpoint(test_client):
+def test_metrics_endpoint(test_client, mock_api_key):
     """Test that metrics endpoint returns Prometheus metrics."""
     # Mock process collector to avoid bytes vs string error
     with patch('prometheus_client.process_collector.ProcessCollector.collect', return_value=[]), \
          patch('src.gmail_service.gmail_client.GmailClient.__init__', return_value=None), \
          patch('src.ai_service.ai_processor.AIProcessor.__init__', return_value=None), \
          patch('src.slack_service.slack_client.SlackServiceClient.__init__', return_value=None), \
-         patch('src.api.dependencies.get_api_key', return_value="test-api-key"), \
          patch('src.api.dependencies.get_gmail_client', return_value=MagicMock()), \
          patch('src.api.dependencies.get_ai_processor', return_value=MagicMock()), \
          patch('src.api.dependencies.get_slack_client', return_value=MagicMock()):
@@ -49,7 +48,8 @@ def test_metrics_endpoint(test_client):
         AI_REQUESTS.labels(status="success").inc()
         ACTIVE_CONNECTIONS.set(5)
         
-        response = test_client.get("/api/v1/metrics")
+        headers = {"X-API-KEY": mock_api_key}
+        response = test_client.get("/api/v1/metrics", headers=headers)
         
         assert response.status_code == 200
         assert "text/plain" in response.headers["content-type"]
