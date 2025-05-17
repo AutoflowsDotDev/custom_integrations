@@ -21,6 +21,12 @@ from src.core.config import (
 )
 from src.core.types import EmailData
 from src.utils.logger import get_logger
+from src.utils.exceptions import (
+    GmailServiceError,
+    GmailAuthenticationError,
+    GmailAPIError,
+    MessageProcessingError
+)
 
 logger = get_logger(__name__)
 
@@ -63,9 +69,22 @@ class GmailClient:
             service = build('gmail', 'v1', credentials=delegated_credentials)
             logger.info("Gmail API service built successfully using service account authentication.")
             return service
+        except FileNotFoundError as e:
+            error_msg = f"Service account file not found: {e}"
+            logger.error(error_msg)
+            raise GmailAuthenticationError(error_msg) from e
+        except PermissionError as e:
+            error_msg = f"Permission error accessing service account file: {e}"
+            logger.error(error_msg)
+            raise GmailAuthenticationError(error_msg) from e
+        except HttpError as e:
+            error_msg = f"Gmail API HTTP error during service account auth: {e}"
+            logger.error(error_msg)
+            raise GmailAPIError(error_msg) from e
         except Exception as e:
-            logger.error(f"Error authenticating with service account: {e}")
-            return None
+            error_msg = f"Error authenticating with service account: {e}"
+            logger.error(error_msg)
+            raise GmailAuthenticationError(error_msg) from e
 
     def _get_oauth_gmail_service(self) -> Optional[Resource]:
         """Authenticates using OAuth user flow and returns the Gmail API service client.
@@ -147,95 +166,7 @@ class GmailClient:
             logger.error(f"Unexpected error with label '{label_name}': {e}")
             return None
 
-    def get_email_details(self, message_id: str) -> Optional[EmailData]:
-        """Fetches details of a specific email."""
-        if not self.service:
-            return None
-        try:
-            # Requesting full format to get all parts, including plain text and HTML
-            # Also requesting headers to extract sender, subject, and date
-            message = self.service.users().messages().get(userId=GMAIL_USER_ID, id=message_id, format='full').execute()
-            
-            payload = message.get('payload', {})
-            headers = payload.get('headers', [])
-            
-            subject = None
-            sender = None
-            date_str = None
-
-            for header in headers:
-                name = header.get('name', '').lower()
-                if name == 'subject':
-                    subject = header.get('value')
-                elif name == 'from':
-                    sender = header.get('value')
-                elif name == 'date':
-                    date_str = header.get('value')
-            
-            # Parse date string to datetime object (simplified, robust parsing might be needed)
-            try:
-                # Example: "Wed, 5 Jun 2024 10:30:00 +0000 (UTC)" or similar
-                # This parsing is basic. For robustness, consider `dateutil.parser`
-                if date_str:
-                    received_timestamp = datetime.strptime(date_str.split(' (')[0], '%a, %d %b %Y %H:%M:%S %z')
-                else:
-                    received_timestamp = datetime.now(timezone.utc)
-            except (ValueError, TypeError) as e:
-                logger.warning(f"Could not parse date string '{date_str}': {e}. Using current UTC time.")
-                received_timestamp = datetime.now(timezone.utc)
-
-            body_plain: Optional[str] = None
-            body_html: Optional[str] = None
-
-            parts = payload.get('parts', [])
-            if parts:
-                for part in parts:
-                    mime_type = part.get('mimeType', '')
-                    if mime_type == 'text/plain':
-                        data = part.get('body', {}).get('data')
-                        if data:
-                            body_plain = base64.urlsafe_b64decode(data.encode('ASCII')).decode('utf-8')
-                    elif mime_type == 'text/html':
-                        data = part.get('body', {}).get('data')
-                        if data:
-                            body_html = base64.urlsafe_b64decode(data.encode('ASCII')).decode('utf-8')
-                    if body_plain and body_html: # Prefer plain if both found early
-                        break 
-            else: # No parts, body might be directly in payload
-                data = payload.get('body', {}).get('data')
-                mime_type = payload.get('mimeType', '')
-                if data:
-                    decoded_data = base64.urlsafe_b64decode(data.encode('ASCII')).decode('utf-8')
-                    if mime_type == 'text/plain':
-                        body_plain = decoded_data
-                    elif mime_type == 'text/html':
-                        body_html = decoded_data
-            
-            # Fallback if specific content types not found but there is some primary body
-            if not body_plain and not body_html and payload.get('body',{}).get('data'):
-                data = payload.get('body',{}).get('data')
-                body_plain = base64.urlsafe_b64decode(data.encode('ASCII')).decode('utf-8')
-                logger.info(f"Using main payload body for message {message_id} as plain text was not explicitly found.")
-
-
-            email_data: EmailData = {
-                'id': message.get('id', message_id),
-                'thread_id': message.get('threadId', ''),
-                'subject': subject,
-                'sender': sender,
-                'body_plain': body_plain,
-                'body_html': body_html,
-                'received_timestamp': received_timestamp,
-                'snippet': message.get('snippet')
-            }
-            return email_data
-
-        except HttpError as error:
-            logger.error(f'An API error occurred while fetching email {message_id}: {error}')
-            return None
-        except Exception as e:
-            logger.error(f"Unexpected error fetching email {message_id}: {e}")
-            return None
+        def get_email_details(self, message_id: str) -> Optional[EmailData]:        """Fetches details of a specific email."""        if not self.service:            error_msg = "Gmail service is not initialized"            logger.error(error_msg)            raise GmailServiceError(error_msg)                    try:            # Requesting full format to get all parts, including plain text and HTML            # Also requesting headers to extract sender, subject, and date            message = self.service.users().messages().get(userId=GMAIL_USER_ID, id=message_id, format='full').execute()                        payload = message.get('payload', {})            headers = payload.get('headers', [])                        subject = None            sender = None            date_str = None            for header in headers:                name = header.get('name', '').lower()                if name == 'subject':                    subject = header.get('value')                elif name == 'from':                    sender = header.get('value')                elif name == 'date':                    date_str = header.get('value')                        # Parse date string to datetime object (simplified, robust parsing might be needed)            try:                # Example: "Wed, 5 Jun 2024 10:30:00 +0000 (UTC)" or similar                # This parsing is basic. For robustness, consider `dateutil.parser`                if date_str:                    received_timestamp = datetime.strptime(date_str.split(' (')[0], '%a, %d %b %Y %H:%M:%S %z')                else:                    received_timestamp = datetime.now(timezone.utc)            except (ValueError, TypeError) as e:                logger.warning(f"Could not parse date string '{date_str}': {e}. Using current UTC time.")                received_timestamp = datetime.now(timezone.utc)            body_plain: Optional[str] = None            body_html: Optional[str] = None            parts = payload.get('parts', [])            if parts:                for part in parts:                    mime_type = part.get('mimeType', '')                    if mime_type == 'text/plain':                        data = part.get('body', {}).get('data')                        if data:                            body_plain = base64.urlsafe_b64decode(data.encode('ASCII')).decode('utf-8')                    elif mime_type == 'text/html':                        data = part.get('body', {}).get('data')                        if data:                            body_html = base64.urlsafe_b64decode(data.encode('ASCII')).decode('utf-8')                    if body_plain and body_html: # Prefer plain if both found early                        break             else: # No parts, body might be directly in payload                data = payload.get('body', {}).get('data')                mime_type = payload.get('mimeType', '')                if data:                    decoded_data = base64.urlsafe_b64decode(data.encode('ASCII')).decode('utf-8')                    if mime_type == 'text/plain':                        body_plain = decoded_data                    elif mime_type == 'text/html':                        body_html = decoded_data                        # Fallback if specific content types not found but there is some primary body            if not body_plain and not body_html and payload.get('body',{}).get('data'):                data = payload.get('body',{}).get('data')                body_plain = base64.urlsafe_b64decode(data.encode('ASCII')).decode('utf-8')                logger.info(f"Using main payload body for message {message_id} as plain text was not explicitly found.")            email_data: EmailData = {                'id': message.get('id', message_id),                'thread_id': message.get('threadId', ''),                'subject': subject,                'sender': sender,                'body_plain': body_plain,                'body_html': body_html,                'received_timestamp': received_timestamp,                'snippet': message.get('snippet')            }            return email_data        except HttpError as e:            error_msg = f'Gmail API error occurred while fetching email {message_id}: {e}'            logger.error(error_msg)            raise GmailAPIError(error_msg) from e        except ValueError as e:            error_msg = f"Value error processing email {message_id}: {e}"            logger.error(error_msg)            raise MessageProcessingError(error_msg) from e        except Exception as e:            error_msg = f"Unexpected error fetching email {message_id}: {e}"            logger.error(error_msg)            raise MessageProcessingError(error_msg) from e
 
     def apply_urgent_label(self, message_id: str) -> bool:
         """Applies the 'URGENT_AI' label to a message."""

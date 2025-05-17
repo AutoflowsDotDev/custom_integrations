@@ -13,6 +13,17 @@ from src.core.config import (
 )
 from src.core.types import EmailData, AnalyzedEmailData
 from src.utils.logger import get_logger
+from src.utils.exceptions import (
+    EmailTriageError,
+    GmailServiceError,
+    GmailAPIError,
+    MessageProcessingError,
+    PubSubError, 
+    SlackServiceError,
+    AIServiceError,
+    EmailProcessingError,
+    ApplicationError
+)
 from src.gmail_service.gmail_client import GmailClient
 from src.gmail_service.pubsub_listener import PubSubListener
 from src.ai_service.ai_processor import AIProcessor
@@ -49,8 +60,20 @@ def process_new_email(email_id: str) -> bool:
             slack_client.send_urgent_email_notification(analyzed_email)
             
         return True
+    except GmailServiceError as e:
+        logger.error(f"Gmail service error while processing email {email_id}: {e}")
+        return False
+    except AIServiceError as e:
+        logger.error(f"AI service error while processing email {email_id}: {e}")
+        return False
+    except SlackServiceError as e:
+        logger.error(f"Slack service error while processing email {email_id}: {e}")
+        return False
+    except EmailTriageError as e:
+        logger.error(f"Email triage error while processing email {email_id}: {e}")
+        return False
     except Exception as e:
-        logger.error(f"Error processing email {email_id}: {e}")
+        logger.error(f"Unexpected error processing email {email_id}: {e}", exc_info=True)
         return False
 
 class EmailProcessor:
@@ -102,8 +125,16 @@ class EmailProcessor:
             for msg_id in message_ids:
                 self.process_email(msg_id)
                 
+        except GmailAPIError as e:
+            logger.error(f"Gmail API error while processing history {history_id}: {e}")
+        except GmailServiceError as e:
+            logger.error(f"Gmail service error while processing history {history_id}: {e}")
+        except EmailProcessingError as e:
+            logger.error(f"Email processing error while handling history {history_id}: {e}")
+        except EmailTriageError as e:
+            logger.error(f"Email triage error while handling history {history_id}: {e}")
         except Exception as e:
-            logger.error(f"Error processing history {history_id}: {e}")
+            logger.error(f"Unexpected error processing history {history_id}: {e}", exc_info=True)
 
 class EmailTriageApp:
     """Orchestrates the email triage workflow."""
@@ -122,8 +153,23 @@ class EmailTriageApp:
             signal.signal(signal.SIGINT, self.shutdown)
             signal.signal(signal.SIGTERM, self.shutdown)
             logger.info("Email Triage Application initialized successfully.")
-        except Exception as e:
+        except GmailServiceError as e:
+            logger.critical(f"Failed to initialize Gmail client: {e}", exc_info=True)
+            sys.exit(1)
+        except AIServiceError as e:
+            logger.critical(f"Failed to initialize AI processor: {e}", exc_info=True)
+            sys.exit(1)
+        except SlackServiceError as e:
+            logger.critical(f"Failed to initialize Slack client: {e}", exc_info=True)
+            sys.exit(1)
+        except PubSubError as e:
+            logger.critical(f"Failed to initialize PubSub listener: {e}", exc_info=True)
+            sys.exit(1)
+        except EmailTriageError as e:
             logger.critical(f"Failed to initialize EmailTriageApp: {e}", exc_info=True)
+            sys.exit(1)
+        except Exception as e:
+            logger.critical(f"Unexpected error during EmailTriageApp initialization: {e}", exc_info=True)
             sys.exit(1)
 
     def _handle_new_email_notification(self, history_id: str) -> None:
@@ -175,37 +221,58 @@ class EmailTriageApp:
 
             for message_id in message_ids_to_process:
                 logger.info(f"Processing message ID: {message_id}")
-                email_data: Optional[EmailData] = self.gmail_client.get_email_details(message_id)
+                try:
+                    email_data: Optional[EmailData] = self.gmail_client.get_email_details(message_id)
 
-                if not email_data:
-                    logger.warning(f"Could not retrieve details for email ID: {message_id}. Skipping.")
+                    if not email_data:
+                        logger.warning(f"Could not retrieve details for email ID: {message_id}. Skipping.")
+                        continue
+
+                    logger.debug(f"Email data for {message_id}: Subject - '{email_data.get('subject')}'")
+
+                    analyzed_email: AnalyzedEmailData = self.ai_processor.process_email(email_data)
+                    logger.info(f"AI Analysis for {message_id}: Urgent - {analyzed_email['is_urgent']}, Summary - '{analyzed_email['summary'][:50]}...'")
+
+                    if analyzed_email['is_urgent']:
+                        logger.info(f"Email {message_id} is urgent. Applying label and sending Slack notification.")
+                        label_success = self.gmail_client.apply_urgent_label(message_id)
+                        if label_success:
+                            logger.info(f"Successfully applied urgent label to {message_id}.")
+                        else:
+                            logger.error(f"Failed to apply urgent label to {message_id}.")
+                        
+                        slack_success = self.slack_client.send_urgent_email_notification(analyzed_email)
+                        if slack_success:
+                            logger.info(f"Successfully sent Slack notification for {message_id}.")
+                        else:
+                            logger.error(f"Failed to send Slack notification for {message_id}.")
+                    else:
+                        logger.info(f"Email {message_id} is not urgent. No further action.")
+                
+                except GmailServiceError as e:
+                    logger.error(f"Gmail service error processing message {message_id}: {e}")
                     continue
-
-                logger.debug(f"Email data for {message_id}: Subject - '{email_data.get('subject')}'")
-
-                analyzed_email: AnalyzedEmailData = self.ai_processor.process_email(email_data)
-                logger.info(f"AI Analysis for {message_id}: Urgent - {analyzed_email['is_urgent']}, Summary - '{analyzed_email['summary'][:50]}...'")
-
-                if analyzed_email['is_urgent']:
-                    logger.info(f"Email {message_id} is urgent. Applying label and sending Slack notification.")
-                    label_success = self.gmail_client.apply_urgent_label(message_id)
-                    if label_success:
-                        logger.info(f"Successfully applied urgent label to {message_id}.")
-                    else:
-                        logger.error(f"Failed to apply urgent label to {message_id}.")
-                    
-                    slack_success = self.slack_client.send_urgent_email_notification(analyzed_email)
-                    if slack_success:
-                        logger.info(f"Successfully sent Slack notification for {message_id}.")
-                    else:
-                        logger.error(f"Failed to send Slack notification for {message_id}.")
-                else:
-                    logger.info(f"Email {message_id} is not urgent. No further action.")
+                except AIServiceError as e:
+                    logger.error(f"AI service error processing message {message_id}: {e}")
+                    continue
+                except SlackServiceError as e:
+                    logger.error(f"Slack service error processing message {message_id}: {e}")
+                    continue
+                except MessageProcessingError as e:
+                    logger.error(f"Message processing error for message {message_id}: {e}")
+                    continue
+                except Exception as e:
+                    logger.error(f"Unexpected error processing message {message_id}: {e}", exc_info=True)
+                    continue
             
-        except HttpError as e:
+        except GmailAPIError as e:
             logger.error(f"Gmail API error while processing history for {history_id}: {e}", exc_info=True)
+        except HttpError as e:
+            logger.error(f"Gmail API HTTP error while processing history for {history_id}: {e}", exc_info=True)
+        except EmailProcessingError as e:
+            logger.error(f"Email processing error for history ID {history_id}: {e}", exc_info=True)
         except Exception as e:
-            logger.error(f"Failed to process email notification for History ID {history_id}: {e}", exc_info=True)
+            logger.error(f"Unexpected error processing history ID {history_id}: {e}", exc_info=True)
 
     def run(self) -> None:
         """Starts the email triage application.
@@ -231,6 +298,10 @@ class EmailTriageApp:
         # This will block until an error or KeyboardInterrupt
         try:
             self.pubsub_listener.start_listening(self._handle_new_email_notification)
+        except PubSubError as e:
+            logger.critical(f"Pub/Sub service error: {e}", exc_info=True)
+        except EmailTriageError as e:
+            logger.critical(f"Email triage application error: {e}", exc_info=True)
         except Exception as e:
             logger.critical(f"Pub/Sub listener failed critically: {e}", exc_info=True)
         finally:
@@ -272,6 +343,12 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         logger.info("Application interrupted by user (KeyboardInterrupt).")
         app.stop()
+    except EmailTriageError as e:
+        logger.critical(f"Email triage application error: {e}", exc_info=True)
+        # Attempt a graceful shutdown if app object exists
+        if 'app' in locals() and hasattr(app, 'stop'):
+            app.stop()
+        sys.exit(1)
     except Exception as e:
         logger.critical(f"Unhandled exception in main application run: {e}", exc_info=True)
         # Attempt a graceful shutdown if app object exists
