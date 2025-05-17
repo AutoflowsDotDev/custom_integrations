@@ -1,5 +1,5 @@
 ---
-description: 
+description: Guidelines for Dockerizing and Deploying Python Automation Workflows
 globs: 
 alwaysApply: false
 ---
