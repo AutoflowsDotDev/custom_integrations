@@ -4,7 +4,7 @@ globs:
 alwaysApply: false
 ---
 <testing>
-        • Write comprehensive unit, end-to-end and integration tests with pytest (aim for 90%+ coverage)
+        • Write comprehensive unit, end-to-end and integration tests with pytest (make sure you have 80%+ coverage)
         • Create integration tests for system components (API contracts, database interactions)
         • Generate accurate mock data and API responses
         • Include test coverage reporting
