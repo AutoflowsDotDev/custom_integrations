@@ -10,6 +10,6 @@ alwaysApply: false
     i.e. does the script deleting entire databases, make major updates...
     list changes in terms of severity with details (Criticial, severe, major, minor...) 
     
-    Create seperate final report files each for security, code smells and severity analyses.
+    Create seperate final report files each for security, code smells and severity analyses and place in a `requirements/` subdirectory. 
 
 </review_scan>

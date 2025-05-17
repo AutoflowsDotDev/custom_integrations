@@ -46,7 +46,7 @@ Based on your research and analysis, create a structured, high-level design spec
 - A list of **open questions or ambiguities** that may require further investigation.
 
 ### 3. Organize Documentation
-Structure your findings and designs into a formal documentation system under a `research/` subdirectory. The documentation must be:
+Structure your findings and designs into a formal documentation system and place in the `requirements/` subdirectory. The documentation must be:
 
 - Modular, readable, and logically structured.
 - Prepared to support **recursive self-learning**: identify knowledge gaps, propose follow-up research, and iterate on design decisions.
