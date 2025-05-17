@@ -7,6 +7,11 @@ from datetime import datetime
 from unittest.mock import MagicMock, patch
 import base64
 
+# Add pytest-asyncio configuration
+pytest_plugins = ['pytest_asyncio']
+# Set default async fixture scope to function to avoid deprecation warning
+pytestmark = pytest.mark.asyncio_mode("strict")
+
 from src.core.types import EmailData, AnalyzedEmailData
 
 
@@ -42,14 +47,25 @@ def mock_env_variables():
     """Set environment variables for testing."""
     os.environ["GOOGLE_CLIENT_SECRETS_JSON_PATH"] = "dummy/path/client_secret.json"
     os.environ["GOOGLE_CREDENTIALS_JSON_PATH"] = "dummy/path/credentials.json"
+    os.environ["GOOGLE_SERVICE_ACCOUNT_PATH"] = "dummy/path/service_account.json"
     os.environ["GOOGLE_CLOUD_PROJECT_ID"] = "test-project-id"
     os.environ["GOOGLE_PUBSUB_TOPIC_ID"] = "test-topic-id"
     os.environ["GOOGLE_PUBSUB_SUBSCRIPTION_ID"] = "test-subscription-id"
     os.environ["SLACK_BOT_TOKEN"] = "xoxb-test-token"
     os.environ["SLACK_CHANNEL_ID"] = "C123456789"
     os.environ["LOG_LEVEL"] = "DEBUG"
+    os.environ["API_KEY"] = "test-api-key"
     yield
     # No need to clean up - environment variables are process-scoped
+
+
+@pytest.fixture(scope="session", autouse=True)
+def mock_service_files():
+    """Mock the existence of service account files."""
+    with patch('os.path.exists', return_value=True), \
+         patch('builtins.open', MagicMock()), \
+         patch('json.load', return_value={'type': 'service_account'}):
+        yield
 
 
 @pytest.fixture(scope="session", autouse=True)
