@@ -293,22 +293,46 @@ def mock_ai_processor():
         # Create a process_email method that can be tracked with MagicMock
         original_process_email = processor.process_email
         def mock_process_email(email_data):
-            # For urgent emails
-            if email_data.get('id') == 'urgent_email_id' or (email_data.get('body_plain') and 'urgent' in email_data.get('body_plain', '').lower()):
-                return {
-                    **email_data,
-                    'is_urgent': True,
-                    'urgency_score': 0.92,
-                    'summary': 'Urgent email requiring immediate attention.'
-                }
-            # For other emails
-            else:
-                return {
-                    **email_data,
-                    'is_urgent': False,
-                    'urgency_score': 0.15,
-                    'summary': 'Regular email with project update.'
-                }
+            """A simplified wrapper around AIProcessor.process_email.
+
+            This mock implementation now defers the urgency decision to
+            ``processor.analyze_urgency`` so that tests which monkey-patch
+            that method (for example to detect implicit or misleading
+            urgency cues) behave as expected.
+
+            The logic is:
+            1. Extract the plain-text body if available, otherwise fallback
+               to the HTML body when determining urgency.
+            2. Use the (possibly monkey-patched) ``analyze_urgency`` to get
+               the ``is_urgent`` flag and confidence score.
+            3. Return a dictionary that mirrors the real
+               ``AIProcessor.process_email`` output, preserving all original
+               email fields while adding the urgency metadata and a simple
+               summary stub.
+            """
+
+            # Grab the best available body text for analysis
+            body_text = email_data.get('body_plain') or email_data.get('body_html', '')
+
+            # Defer to the (potentially patched) analyse_urgency implementation
+            urgency_info = processor.analyze_urgency(body_text)
+
+            is_urgent = urgency_info.get('is_urgent', False)
+            urgency_score = urgency_info.get('confidence_score') or 0.0
+
+            # Craft a basic summary based on urgency for test assertions
+            summary = (
+                'Urgent email requiring immediate attention.'
+                if is_urgent else
+                'Regular email with project update.'
+            )
+
+            return {
+                **email_data,
+                'is_urgent': is_urgent,
+                'urgency_score': urgency_score,
+                'summary': summary
+            }
         
         processor.process_email = MagicMock(side_effect=mock_process_email)
         

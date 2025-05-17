@@ -75,9 +75,9 @@ def mock_service_files():
         # Fall back to real implementation for other paths
         return original_exists(path)
     
-    # Mock for file open operations
-    mock_file = MagicMock()
-    mock_file.__enter__ = MagicMock(return_value=MagicMock(read=MagicMock(return_value=json.dumps({
+    # Pre-dump the fake service account JSON so that tests reading the file
+    # get deterministic content.
+    _FAKE_SERVICE_ACCOUNT_JSON = json.dumps({
         "type": "service_account",
         "project_id": "test-project",
         "private_key_id": "test_private_key_id",
@@ -88,11 +88,56 @@ def mock_service_files():
         "token_uri": "https://oauth2.googleapis.com/token",
         "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
         "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/test-client-email%40example.com"
-    }))))
-    mock_file.__exit__ = MagicMock(return_value=None)
-        
+    })
+
+    # Cache the original built-in open so we can delegate to it for all non-mock
+    # paths. This prevents interference with third-party libraries such as
+    # coverage.py, which need to read their own binary data files.
+    _real_open = open  # noqa: A001 – shadowing built-in on purpose within scope
+
+    def _mocked_open(path, mode="r", *args, **kwargs):  # noqa: D401,E501
+        """Selective open mock.
+
+        Only intercepts read operations for the credential/service-account JSON
+        files used by the Gmail client setup. For all other paths (including
+        coverage data files opened in binary mode), the real ``open`` built-in
+        is used to avoid type errors like the one seen when combining coverage
+        reports.
+        """
+
+        # Normalize the incoming path to something we can match on.
+        _path_str = str(path)
+
+        # Detect if this is one of the credential files we want to fake.
+        if any(
+            _path_str.endswith(suffix)
+            for suffix in (
+                "service_account.json",
+                "credentials.json",
+                "client_secret.json",
+            )
+        ) and "r" in mode:
+            mock_file = MagicMock()
+            # Ensure read() returns *bytes* if the caller opened in binary
+            # mode, otherwise str. This maintains compatibility with the
+            # caller's expectations.
+            content_bytes = _FAKE_SERVICE_ACCOUNT_JSON.encode()
+            if "b" in mode:
+                mock_file.read.return_value = content_bytes
+            else:
+                mock_file.read.return_value = _FAKE_SERVICE_ACCOUNT_JSON
+
+            # Context manager support
+            mock_file.__enter__.return_value = mock_file
+            mock_file.__exit__.return_value = None
+
+            return mock_file
+
+        # Fallback to the real open for everything else.
+        return _real_open(path, mode, *args, **kwargs)
+
     with patch('os.path.exists', mock_exists), \
-         patch('builtins.open', MagicMock(return_value=mock_file)), \
+         patch('builtins.open', _mocked_open), \
          patch('json.load', side_effect=lambda f: json.loads(f.read())):
         yield
 
