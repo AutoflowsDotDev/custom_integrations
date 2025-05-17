@@ -475,7 +475,8 @@ class TestEmailTriageApp:
     @patch('src.main.AIProcessor')
     @patch('src.main.SlackServiceClient')
     @patch('src.main.PubSubListener')
-    def test_run_successful(self, mock_pubsub, mock_slack, mock_ai, mock_gmail):
+    @patch('src.main.sys.exit')
+    def test_run_successful(self, mock_exit, mock_pubsub, mock_slack, mock_ai, mock_gmail):
         """Test run method with successful setup."""
         # Arrange
         app = EmailTriageApp()
@@ -487,12 +488,14 @@ class TestEmailTriageApp:
         # Assert
         mock_gmail.return_value.setup_push_notifications.assert_called_once()
         mock_pubsub.return_value.start_listening.assert_called_once_with(app._handle_new_email_notification)
+        mock_exit.assert_called_once_with(0)  # Should exit cleanly
         
     @patch('src.main.GmailClient')
     @patch('src.main.AIProcessor')
     @patch('src.main.SlackServiceClient')
     @patch('src.main.PubSubListener')
-    def test_run_setup_failed(self, mock_pubsub, mock_slack, mock_ai, mock_gmail):
+    @patch('src.main.sys.exit')
+    def test_run_setup_failed(self, mock_exit, mock_pubsub, mock_slack, mock_ai, mock_gmail):
         """Test run method when push notification setup fails."""
         # Arrange
         app = EmailTriageApp()
@@ -504,13 +507,15 @@ class TestEmailTriageApp:
         # Assert
         mock_gmail.return_value.setup_push_notifications.assert_called_once()
         mock_pubsub.return_value.start_listening.assert_called_once_with(app._handle_new_email_notification)
-        
+        mock_exit.assert_called_once_with(0)  # Still exits cleanly, just logs a warning
+    
     @patch('src.main.GmailClient')
     @patch('src.main.AIProcessor')
     @patch('src.main.SlackServiceClient')
     @patch('src.main.PubSubListener')
-    def test_run_no_gmail_client(self, mock_pubsub, mock_slack, mock_ai, mock_gmail):
-        """Test run method when Gmail client is not initialized."""
+    @patch('src.main.sys.exit')
+    def test_run_no_gmail_client(self, mock_exit, mock_pubsub, mock_slack, mock_ai, mock_gmail):
+        """Test run method without a valid Gmail client."""
         # Arrange
         app = EmailTriageApp()
         app.gmail_client = None
@@ -519,13 +524,17 @@ class TestEmailTriageApp:
         app.run()
         
         # Assert
+        # When Gmail client is not initialized, the app should not start the listener
         mock_pubsub.return_value.start_listening.assert_not_called()
-        
+        # The method returns early without calling sys.exit
+        mock_exit.assert_not_called()
+    
     @patch('src.main.GmailClient')
     @patch('src.main.AIProcessor')
     @patch('src.main.SlackServiceClient')
     @patch('src.main.PubSubListener')
-    def test_shutdown(self, mock_pubsub, mock_slack, mock_ai, mock_gmail):
+    @patch('src.main.sys.exit')
+    def test_shutdown(self, mock_exit, mock_pubsub, mock_slack, mock_ai, mock_gmail):
         """Test shutdown method."""
         # Arrange
         app = EmailTriageApp()
@@ -537,4 +546,5 @@ class TestEmailTriageApp:
         
         # Assert
         assert app._running is False
-        mock_gmail.return_value.stop_push_notifications.assert_called_once() 
+        mock_gmail.return_value.stop_push_notifications.assert_called_once()
+        mock_exit.assert_called_once_with(0)  # Exits cleanly 
