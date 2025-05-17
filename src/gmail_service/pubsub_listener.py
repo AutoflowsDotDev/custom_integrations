@@ -43,18 +43,33 @@ class PubSubListener:
             # For `watch` on `users`, the notification data is a JSON string:
             # { "emailAddress": "user@example.com", "historyId": "1234567890" }
             
-            notification_data_str = message.data.decode("utf-8")
+            if not message.data:
+                logger.warning("Received empty Pub/Sub message data")
+                return None
+                
+            try:
+                notification_data_str = message.data.decode("utf-8")
+            except (UnicodeDecodeError, AttributeError):
+                logger.error(f"Failed to decode Pub/Sub message data: {message.data}")
+                return None
+                
             logger.debug(f"Received raw Pub/Sub message data: {notification_data_str}")
             
-            notification_payload = json.loads(notification_data_str)
+            try:
+                notification_payload = json.loads(notification_data_str)
+            except json.JSONDecodeError as json_err:
+                logger.error(f"Failed to decode JSON from Pub/Sub message: {notification_data_str}. Error: {json_err}")
+                return None
+                
             email_address = notification_payload.get("emailAddress")
             history_id = notification_payload.get("historyId")
 
-            if not email_address or not history_id:
-                logger.warning(f"Received Pub/Sub message without emailAddress or historyId: {notification_payload}")
+            # Check if history_id exists (not if it's empty/falsy)
+            if "historyId" not in notification_payload:
+                logger.warning(f"Received Pub/Sub message without historyId: {notification_payload}")
                 return None
 
-            logger.info(f"Received notification for {email_address} with history ID: {history_id}")
+            logger.info(f"Received notification for {email_address or 'unknown email'} with history ID: {history_id}")
             
             # IMPORTANT: The push notification from users.watch() gives a historyId.
             # You need to use users.history.list with this historyId to find new messageIds.
@@ -83,7 +98,7 @@ class PubSubListener:
         def message_handler(message: pubsub_v1.types.ReceivedMessage) -> None:
             logger.info(f"Received Pub/Sub message ID: {message.message_id}")
             history_id = self._process_payload(message)
-            if history_id:
+            if history_id is not None:  # Allow empty string history_id
                 try:
                     callback(history_id) # Pass history_id to the main processing logic
                     message.ack() # Acknowledge after successful processing by callback

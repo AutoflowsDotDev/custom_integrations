@@ -8,13 +8,13 @@ import base64
 from datetime import datetime, timezone
 
 # Standard Gmail notification Pub/Sub message
+STANDARD_GMAIL_PUBSUB_DATA = json.dumps({
+    'emailAddress': 'user@example.com',
+    'historyId': '12345'
+}).encode('utf-8')
+
 STANDARD_GMAIL_PUBSUB_MESSAGE = {
-    'data': base64.b64encode(
-        json.dumps({
-            'emailAddress': 'user@example.com',
-            'historyId': '12345'
-        }).encode('utf-8')
-    ),
+    'data': base64.b64encode(STANDARD_GMAIL_PUBSUB_DATA),
     'attributes': {
         'origin': 'gmail',
         'timestamp': str(int(datetime.now(timezone.utc).timestamp()))
@@ -24,13 +24,13 @@ STANDARD_GMAIL_PUBSUB_MESSAGE = {
 }
 
 # Message with very large history ID
+LARGE_HISTORY_ID_DATA = json.dumps({
+    'emailAddress': 'user@example.com',
+    'historyId': '999999999999999'
+}).encode('utf-8')
+
 LARGE_HISTORY_ID_MESSAGE = {
-    'data': base64.b64encode(
-        json.dumps({
-            'emailAddress': 'user@example.com',
-            'historyId': '999999999999999'
-        }).encode('utf-8')
-    ),
+    'data': base64.b64encode(LARGE_HISTORY_ID_DATA),
     'attributes': {
         'origin': 'gmail',
         'timestamp': str(int(datetime.now(timezone.utc).timestamp()))
@@ -41,9 +41,7 @@ LARGE_HISTORY_ID_MESSAGE = {
 
 # Message with invalid/malformed JSON data
 INVALID_JSON_MESSAGE = {
-    'data': base64.b64encode(
-        '{emailAddress: user@example.com, historyId: 12345}'.encode('utf-8')  # Invalid JSON
-    ),
+    'data': base64.b64encode('{emailAddress: user@example.com, historyId: 12345}'.encode('utf-8')),  # Invalid JSON
     'attributes': {
         'origin': 'gmail',
         'timestamp': str(int(datetime.now(timezone.utc).timestamp()))
@@ -53,13 +51,13 @@ INVALID_JSON_MESSAGE = {
 }
 
 # Message with missing required fields
+MISSING_FIELDS_DATA = json.dumps({
+    'emailAddress': 'user@example.com'
+    # Missing historyId
+}).encode('utf-8')
+
 MISSING_FIELDS_MESSAGE = {
-    'data': base64.b64encode(
-        json.dumps({
-            'emailAddress': 'user@example.com'
-            # Missing historyId
-        }).encode('utf-8')
-    ),
+    'data': base64.b64encode(MISSING_FIELDS_DATA),
     'attributes': {
         'origin': 'gmail',
         'timestamp': str(int(datetime.now(timezone.utc).timestamp()))
@@ -69,13 +67,13 @@ MISSING_FIELDS_MESSAGE = {
 }
 
 # Message with empty fields
+EMPTY_FIELDS_DATA = json.dumps({
+    'emailAddress': '',
+    'historyId': ''
+}).encode('utf-8')
+
 EMPTY_FIELDS_MESSAGE = {
-    'data': base64.b64encode(
-        json.dumps({
-            'emailAddress': '',
-            'historyId': ''
-        }).encode('utf-8')
-    ),
+    'data': base64.b64encode(EMPTY_FIELDS_DATA),
     'attributes': {
         'origin': 'gmail',
         'timestamp': str(int(datetime.now(timezone.utc).timestamp()))
@@ -85,13 +83,13 @@ EMPTY_FIELDS_MESSAGE = {
 }
 
 # Message with non-Gmail origin (should be ignored)
+NON_GMAIL_DATA = json.dumps({
+    'someOtherService': 'data',
+    'actionId': '67890'
+}).encode('utf-8')
+
 NON_GMAIL_MESSAGE = {
-    'data': base64.b64encode(
-        json.dumps({
-            'someOtherService': 'data',
-            'actionId': '67890'
-        }).encode('utf-8')
-    ),
+    'data': base64.b64encode(NON_GMAIL_DATA),
     'attributes': {
         'origin': 'other-service',
         'timestamp': str(int(datetime.now(timezone.utc).timestamp()))
@@ -102,7 +100,7 @@ NON_GMAIL_MESSAGE = {
 
 # Message with non-base64 data
 NON_BASE64_MESSAGE = {
-    'data': 'This is not base64 encoded data',
+    'data': 'This is not base64 encoded data'.encode('utf-8'),  # Ensure it's bytes
     'attributes': {
         'origin': 'gmail',
         'timestamp': str(int(datetime.now(timezone.utc).timestamp()))
@@ -113,7 +111,7 @@ NON_BASE64_MESSAGE = {
 
 # Message with empty data
 EMPTY_DATA_MESSAGE = {
-    'data': '',
+    'data': b'',  # Ensure it's bytes
     'attributes': {
         'origin': 'gmail',
         'timestamp': str(int(datetime.now(timezone.utc).timestamp()))
@@ -123,19 +121,19 @@ EMPTY_DATA_MESSAGE = {
 }
 
 # Message with extra unexpected fields (should be handled gracefully)
+EXTRA_FIELDS_DATA = json.dumps({
+    'emailAddress': 'user@example.com',
+    'historyId': '12346',
+    'extraField1': 'value1',
+    'extraField2': 'value2',
+    'nestedExtra': {
+        'nested1': 'value1',
+        'nested2': 'value2'
+    }
+}).encode('utf-8')
+
 EXTRA_FIELDS_MESSAGE = {
-    'data': base64.b64encode(
-        json.dumps({
-            'emailAddress': 'user@example.com',
-            'historyId': '12346',
-            'extraField1': 'value1',
-            'extraField2': 'value2',
-            'nestedExtra': {
-                'nested1': 'value1',
-                'nested2': 'value2'
-            }
-        }).encode('utf-8')
-    ),
+    'data': base64.b64encode(EXTRA_FIELDS_DATA),
     'attributes': {
         'origin': 'gmail',
         'timestamp': str(int(datetime.now(timezone.utc).timestamp())),
@@ -146,13 +144,13 @@ EXTRA_FIELDS_MESSAGE = {
 }
 
 # Message with special characters in email address
+SPECIAL_CHARS_DATA = json.dumps({
+    'emailAddress': 'user+special.chars_123@example.com',
+    'historyId': '12347'
+}).encode('utf-8')
+
 SPECIAL_CHARS_MESSAGE = {
-    'data': base64.b64encode(
-        json.dumps({
-            'emailAddress': 'user+special.chars_123@example.com',
-            'historyId': '12347'
-        }).encode('utf-8')
-    ),
+    'data': base64.b64encode(SPECIAL_CHARS_DATA),
     'attributes': {
         'origin': 'gmail',
         'timestamp': str(int(datetime.now(timezone.utc).timestamp()))
@@ -167,7 +165,9 @@ def create_pubsub_received_message(msg_dict):
     class MockReceivedMessage:
         def __init__(self, message_dict):
             self.message_id = message_dict.get('message_id', '')
-            self.data = message_dict.get('data', b'')
+            # Ensure data is bytes, not string
+            data = message_dict.get('data', b'')
+            self.data = data if isinstance(data, bytes) else str(data).encode('utf-8')
             self.attributes = message_dict.get('attributes', {})
             self.publish_time = message_dict.get('publish_time', '')
             self.ack = lambda: None  # Mock function that does nothing
@@ -217,15 +217,22 @@ RECEIVED_MESSAGES = {
 
 # Export for easy import in tests
 __all__ = [
+    'STANDARD_GMAIL_PUBSUB_DATA',
     'STANDARD_GMAIL_PUBSUB_MESSAGE',
+    'LARGE_HISTORY_ID_DATA',
     'LARGE_HISTORY_ID_MESSAGE',
     'INVALID_JSON_MESSAGE',
+    'MISSING_FIELDS_DATA',
     'MISSING_FIELDS_MESSAGE',
+    'EMPTY_FIELDS_DATA',
     'EMPTY_FIELDS_MESSAGE',
+    'NON_GMAIL_DATA',
     'NON_GMAIL_MESSAGE',
     'NON_BASE64_MESSAGE',
     'EMPTY_DATA_MESSAGE',
+    'EXTRA_FIELDS_DATA',
     'EXTRA_FIELDS_MESSAGE',
+    'SPECIAL_CHARS_DATA',
     'SPECIAL_CHARS_MESSAGE',
     'STANDARD_RECEIVED_MESSAGE',
     'LARGE_HISTORY_ID_RECEIVED_MESSAGE',
