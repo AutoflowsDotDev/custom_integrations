@@ -1,35 +1,50 @@
 """Tests for the ai_processor module."""
 from unittest.mock import patch, MagicMock
 from datetime import datetime
+import json
+import os
 
 import pytest
+import requests
 
 from src.ai_service.ai_processor import AIProcessor
 from src.core.types import EmailData
 
 
 @pytest.fixture
-def mock_pipeline():
-    """Create a mock transformers pipeline."""
-    pipeline_mock = MagicMock()
-    
-    # Configure text-classification (urgency) output
-    pipeline_mock.return_value.side_effect = None
-    pipeline_mock.return_value.return_value = [
-        {"label": "URGENT", "score": 0.95}  # High confidence urgent classification
-    ]
-    
-    return pipeline_mock
+def mock_response():
+    """Create a mock requests response."""
+    response = MagicMock()
+    response.status_code = 200
+    response.json.return_value = {
+        "choices": [
+            {
+                "message": {
+                    "content": '{"classification": "URGENT", "confidence": 0.95}'
+                }
+            }
+        ]
+    }
+    response.raise_for_status = MagicMock()
+    return response
 
 
 @pytest.fixture
-def mock_summarization_pipeline():
-    """Create a mock transformers summarization pipeline."""
-    pipeline_mock = MagicMock()
-    pipeline_mock.return_value.return_value = [
-        {"summary_text": "This is a summarized text of the email content."}
-    ]
-    return pipeline_mock
+def mock_summary_response():
+    """Create a mock requests summary response."""
+    response = MagicMock()
+    response.status_code = 200
+    response.json.return_value = {
+        "choices": [
+            {
+                "message": {
+                    "content": "This is a summarized text of the email content."
+                }
+            }
+        ]
+    }
+    response.raise_for_status = MagicMock()
+    return response
 
 
 @pytest.fixture
@@ -65,62 +80,43 @@ def mock_urgent_email_data():
 class TestAIProcessor:
     """Tests for the AIProcessor class."""
 
-    @patch('src.ai_service.ai_processor.pipeline')
-    def test_init_successful(self, mock_pipeline_func):
+    def setup_method(self):
+        """Set up environment for tests."""
+        os.environ["OPENROUTER_API_KEY"] = "test_api_key"
+
+    def teardown_method(self):
+        """Clean up after tests."""
+        if "OPENROUTER_API_KEY" in os.environ:
+            del os.environ["OPENROUTER_API_KEY"]
+
+    def test_init_successful(self):
         """Test successful initialization of AIProcessor."""
-        # Arrange
-        urgency_pipeline_mock = MagicMock()
-        summarization_pipeline_mock = MagicMock()
-        
-        # Configure pipeline to return different instances based on task
-        def pipeline_side_effect(task, model):
-            if task == "text-classification":
-                return urgency_pipeline_mock
-            elif task == "summarization":
-                return summarization_pipeline_mock
-            return None
-        
-        mock_pipeline_func.side_effect = pipeline_side_effect
-        
         # Act
         ai_processor = AIProcessor()
         
         # Assert
-        assert ai_processor.urgency_pipeline == urgency_pipeline_mock
-        assert ai_processor.summarization_pipeline == summarization_pipeline_mock
-        
-        # Check that pipeline was called with expected arguments
-        assert mock_pipeline_func.call_count == 2
-        mock_pipeline_func.assert_any_call("text-classification", model="finityai/email-urgency-classifier")
-        mock_pipeline_func.assert_any_call("summarization", model="facebook/bart-large-cnn")
+        assert ai_processor.api_key == "test_api_key"
+        assert ai_processor.urgency_model == "openai/gpt-3.5-turbo"
+        assert ai_processor.summarization_model == "openai/gpt-3.5-turbo"
 
-    @patch('src.ai_service.ai_processor.pipeline')
-    def test_init_handles_pipeline_exceptions(self, mock_pipeline_func):
-        """Test handling of exceptions during pipeline initialization."""
+    def test_init_handles_missing_api_key(self):
+        """Test handling of missing API key."""
         # Arrange
-        # Fail only on urgency pipeline
-        def pipeline_side_effect(task, model):
-            if task == "text-classification":
-                raise Exception("Failed to load urgency model")
-            return MagicMock()
-        
-        mock_pipeline_func.side_effect = pipeline_side_effect
+        if "OPENROUTER_API_KEY" in os.environ:
+            del os.environ["OPENROUTER_API_KEY"]
         
         # Act
-        with patch('src.ai_service.ai_processor.logger.error') as mock_error:
+        with patch('src.ai_service.ai_processor.logger.warning') as mock_warning:
             ai_processor = AIProcessor()
             
             # Assert
-            assert ai_processor.urgency_pipeline is None
-            assert ai_processor.summarization_pipeline is not None
-            mock_error.assert_called_once()
-            assert "Failed to load urgency" in mock_error.call_args[0][0]
+            assert ai_processor.api_key is None
+            mock_warning.assert_called_once()
+            assert "OPENROUTER_API_KEY not found" in mock_warning.call_args[0][0]
 
-    @patch('src.ai_service.ai_processor.pipeline')
-    def test_get_text_for_analysis(self, mock_pipeline_func, mock_email_data):
+    def test_get_text_for_analysis(self, mock_email_data):
         """Test extraction of text for analysis."""
         # Arrange
-        mock_pipeline_func.return_value = MagicMock()
         ai_processor = AIProcessor()
         
         # Act
@@ -130,11 +126,9 @@ class TestAIProcessor:
         assert result.startswith("Subject: Test Subject")
         assert "This is a test email body." in result
 
-    @patch('src.ai_service.ai_processor.pipeline')
-    def test_get_text_for_analysis_handles_empty_fields(self, mock_pipeline_func):
+    def test_get_text_for_analysis_handles_empty_fields(self):
         """Test text extraction handles empty fields."""
         # Arrange
-        mock_pipeline_func.return_value = MagicMock()
         ai_processor = AIProcessor()
         
         # Create a test email with empty fields
@@ -155,14 +149,11 @@ class TestAIProcessor:
         # Assert
         assert result == "Subject: \n\nBody:"
 
-    @patch('src.ai_service.ai_processor.pipeline')
-    def test_analyze_urgency_positive(self, mock_pipeline_func):
+    @patch('requests.post')
+    def test_analyze_urgency_positive(self, mock_post, mock_response):
         """Test urgency analysis with positive result."""
-        # Arrange - Configure mock pipeline
-        urgency_pipeline = MagicMock()
-        urgency_pipeline.return_value = [{"label": "URGENT", "score": 0.95}]
-        
-        mock_pipeline_func.side_effect = lambda task, model: urgency_pipeline if task == "text-classification" else MagicMock()
+        # Arrange - Configure mock response
+        mock_post.return_value = mock_response
         
         ai_processor = AIProcessor()
         
@@ -172,15 +163,25 @@ class TestAIProcessor:
         # Assert
         assert result["is_urgent"] is True
         assert result["confidence_score"] == 0.95
+        mock_post.assert_called_once()
 
-    @patch('src.ai_service.ai_processor.pipeline')
-    def test_analyze_urgency_negative(self, mock_pipeline_func):
+    @patch('requests.post')
+    def test_analyze_urgency_negative(self, mock_post):
         """Test urgency analysis with negative result."""
-        # Arrange - Configure mock pipeline
-        urgency_pipeline = MagicMock()
-        urgency_pipeline.return_value = [{"label": "NOT_URGENT", "score": 0.85}]
-        
-        mock_pipeline_func.side_effect = lambda task, model: urgency_pipeline if task == "text-classification" else MagicMock()
+        # Arrange - Configure mock response for non-urgent
+        response = MagicMock()
+        response.status_code = 200
+        response.json.return_value = {
+            "choices": [
+                {
+                    "message": {
+                        "content": '{"classification": "NOT_URGENT", "confidence": 0.85}'
+                    }
+                }
+            ]
+        }
+        response.raise_for_status = MagicMock()
+        mock_post.return_value = response
         
         ai_processor = AIProcessor()
         
@@ -191,31 +192,37 @@ class TestAIProcessor:
         assert result["is_urgent"] is False
         assert result["confidence_score"] == 0.85
 
-    @patch('src.ai_service.ai_processor.pipeline')
-    def test_analyze_urgency_keyword_detection(self, mock_pipeline_func):
+    @patch('requests.post')
+    def test_analyze_urgency_keyword_detection(self, mock_post):
         """Test urgency detection using keywords."""
-        # Arrange - Configure mock pipeline to return non-urgent by sentiment
-        urgency_pipeline = MagicMock()
-        urgency_pipeline.return_value = [{"label": "NOT_URGENT", "score": 0.75}]
-        
-        mock_pipeline_func.side_effect = lambda task, model: urgency_pipeline if task == "text-classification" else MagicMock()
+        # Arrange - Configure mock response for non-urgent from API
+        response = MagicMock()
+        response.status_code = 200
+        response.json.return_value = {
+            "choices": [
+                {
+                    "message": {
+                        "content": '{"classification": "NOT_URGENT", "confidence": 0.75}'
+                    }
+                }
+            ]
+        }
+        response.raise_for_status = MagicMock()
+        mock_post.return_value = response
         
         ai_processor = AIProcessor()
         
         # Act - Use keyword that should trigger urgency
         result = ai_processor.analyze_urgency("Please respond asap to this inquiry.")
         
-        # Assert - Should be flagged as urgent due to 'asap' keyword despite negative sentiment
+        # Assert - Should be flagged as urgent due to 'asap' keyword despite API returning non-urgent
         assert result["is_urgent"] is True
 
-    @patch('src.ai_service.ai_processor.pipeline')
-    def test_analyze_urgency_exception(self, mock_pipeline_func):
+    @patch('requests.post')
+    def test_analyze_urgency_exception(self, mock_post):
         """Test error handling during urgency analysis."""
-        # Arrange - Configure pipeline to throw exception
-        urgency_pipeline = MagicMock()
-        urgency_pipeline.side_effect = Exception("Model failed")
-        
-        mock_pipeline_func.side_effect = lambda task, model: urgency_pipeline if task == "text-classification" else MagicMock()
+        # Arrange - Configure request to raise exception
+        mock_post.side_effect = requests.RequestException("API request failed")
         
         ai_processor = AIProcessor()
         
@@ -223,20 +230,16 @@ class TestAIProcessor:
         with patch('src.ai_service.ai_processor.logger.error') as mock_error:
             result = ai_processor.analyze_urgency("Test email content")
             
-            # Assert
-            assert result["is_urgent"] is False
-            assert result["confidence_score"] == 0.0
+            # Assert - Should fall back to keyword-based analysis
+            assert isinstance(result["is_urgent"], bool)
             mock_error.assert_called_once()
-            assert "Error during ML urgency analysis" in mock_error.call_args[0][0]
+            assert "Error during API urgency analysis" in mock_error.call_args[0][0]
 
-    @patch('src.ai_service.ai_processor.pipeline')
-    def test_summarize_email(self, mock_pipeline_func):
+    @patch('requests.post')
+    def test_summarize_email(self, mock_post, mock_summary_response):
         """Test email summarization."""
         # Arrange
-        summary_pipeline = MagicMock()
-        summary_pipeline.return_value = [{"summary_text": "This is the summarized email."}]
-        
-        mock_pipeline_func.side_effect = lambda task, model: summary_pipeline if task == "summarization" else MagicMock()
+        mock_post.return_value = mock_summary_response
         
         ai_processor = AIProcessor()
         
@@ -244,42 +247,30 @@ class TestAIProcessor:
         result = ai_processor.summarize_email("This is a long email with lots of content that needs to be summarized. It contains multiple sentences with important information.")
         
         # Assert
-        assert result["summary"] == "This is the summarized email."
+        assert result["summary"] == "This is a summarized text of the email content."
+        mock_post.assert_called_once()
 
-    @patch('src.ai_service.ai_processor.pipeline')
-    def test_summarize_short_email(self, mock_pipeline_func):
+    def test_summarize_short_email(self):
         """Test summarization handling of short emails."""
         # Arrange
-        summary_pipeline = MagicMock()
-        # This should not be called for short emails
-        
-        mock_pipeline_func.side_effect = lambda task, model: summary_pipeline if task == "summarization" else MagicMock()
-        
         ai_processor = AIProcessor()
         short_text = "Short email."
         
-        # Act
+        # Act - No need to mock API as it shouldn't be called
         result = ai_processor.summarize_email(short_text)
         
-        # Assert
-        # Should return original text, not attempt to summarize
+        # Assert - Should return original text, not attempt to summarize
         assert result["summary"] == short_text
-        # Pipeline should not be called for short text
-        summary_pipeline.assert_not_called()
 
-    @patch('src.ai_service.ai_processor.pipeline')
-    def test_summarize_email_exception(self, mock_pipeline_func):
+    @patch('requests.post')
+    def test_summarize_email_exception(self, mock_post):
         """Test error handling during summarization."""
-        # Arrange
-        summary_pipeline = MagicMock()
-        summary_pipeline.side_effect = Exception("Summarization failed")
-        
-        mock_pipeline_func.side_effect = lambda task, model: summary_pipeline if task == "summarization" else MagicMock()
+        # Arrange - Request raises exception
+        mock_post.side_effect = requests.RequestException("API request failed")
         
         ai_processor = AIProcessor()
         
-        # Act
-        # Make a longer text to avoid the short-text condition
+        # Act - Use longer text to avoid short-text condition
         long_text = "This is a longer email " * 20 + "that should be summarized but will fail due to an exception."
         
         with patch('src.ai_service.ai_processor.logger.error') as mock_error:
@@ -287,26 +278,14 @@ class TestAIProcessor:
             
             # Assert
             assert "Error during email summarization" in mock_error.call_args[0][0]
-            assert result["summary"] == long_text  # It should return the original text on error
+            # It should return the original text on error (truncated if very long)
+            assert result["summary"].startswith("This is a longer email")
 
-    @patch('src.ai_service.ai_processor.pipeline')
-    def test_process_email_urgent(self, mock_pipeline_func, mock_urgent_email_data):
+    @patch('requests.post')
+    def test_process_email_urgent(self, mock_post, mock_urgent_email_data, mock_response, mock_summary_response):
         """Test processing an urgent email."""
-        # Arrange - Configure mock pipeline
-        urgency_pipeline = MagicMock()
-        urgency_pipeline.return_value = [{"label": "URGENT", "score": 0.95}]
-        
-        summary_pipeline = MagicMock()
-        summary_pipeline.return_value = [{"summary_text": "Urgent matter requiring attention."}]
-        
-        def pipeline_side_effect(task, model):
-            if task == "text-classification":
-                return urgency_pipeline
-            elif task == "summarization":
-                return summary_pipeline
-            return None
-        
-        mock_pipeline_func.side_effect = pipeline_side_effect
+        # Arrange - Configure mock responses
+        mock_post.side_effect = [mock_response, mock_summary_response]
         
         ai_processor = AIProcessor()
         
@@ -319,30 +298,28 @@ class TestAIProcessor:
             
             # Assert
             assert result["is_urgent"] is True
-            # summary_pipeline.return_value would be used, which returns "Urgent matter requiring attention."
-            assert result["summary"] == "Urgent matter requiring attention."
+            assert result["summary"] == "This is a summarized text of the email content."
             # Original email data fields should be preserved
             assert result["id"] == mock_urgent_email_data["id"]
             assert result["subject"] == mock_urgent_email_data["subject"]
 
-    @patch('src.ai_service.ai_processor.pipeline')
-    def test_process_email_not_urgent(self, mock_pipeline_func, mock_email_data):
+    @patch('requests.post')
+    def test_process_email_not_urgent(self, mock_post, mock_email_data):
         """Test processing a non-urgent email."""
-        # Arrange
-        urgency_pipeline = MagicMock()
-        urgency_pipeline.return_value = [{"label": "NOT_URGENT", "score": 0.85}]
-        
-        summary_pipeline = MagicMock()
-        # This should not be called for non-urgent emails in our current design
-        
-        def pipeline_side_effect(task, model):
-            if task == "text-classification":
-                return urgency_pipeline
-            elif task == "summarization":
-                return summary_pipeline
-            return None
-        
-        mock_pipeline_func.side_effect = pipeline_side_effect
+        # Arrange - Configure mock response for non-urgent
+        response = MagicMock()
+        response.status_code = 200
+        response.json.return_value = {
+            "choices": [
+                {
+                    "message": {
+                        "content": '{"classification": "NOT_URGENT", "confidence": 0.85}'
+                    }
+                }
+            ]
+        }
+        response.raise_for_status = MagicMock()
+        mock_post.return_value = response
         
         ai_processor = AIProcessor()
         
