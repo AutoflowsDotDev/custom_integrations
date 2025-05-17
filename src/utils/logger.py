@@ -4,7 +4,7 @@ import sys
 import os
 from importlib import import_module
 import time
-from typing import Optional
+from typing import Optional, Union
 import uuid
 
 # Create the logs directory if it doesn't exist
@@ -59,8 +59,24 @@ class ContextAdapter(logging.LoggerAdapter):
     def set_request_id(self, request_id: str) -> None:
         """Set the request ID for request tracking."""
         self.extra["request_id"] = request_id
+    
+    # Forward logger attributes for compatibility with tests
+    @property
+    def level(self):
+        """Return the logger's level for test compatibility."""
+        return self.logger.level
+    
+    @property
+    def handlers(self):
+        """Return the logger's handlers for test compatibility."""
+        return self.logger.handlers
+    
+    @property
+    def name(self):
+        """Return the logger's name for test compatibility."""
+        return self.logger.name
 
-def get_logger(name: str) -> ContextAdapter:
+def get_logger(name: str) -> Union[logging.Logger, ContextAdapter]:
     """Return a configured logger instance with context adapter.
     
     The logger includes both console and file handlers with proper formatting
@@ -83,13 +99,16 @@ def get_logger(name: str) -> ContextAdapter:
 
     # Do not add multiple handlers in repeated calls
     if not logger.handlers:
-        # Standard formatter with timestamp, level, and name
-        formatter = logging.Formatter('%(levelname)s - %(asctime)s - %(message)s', 
+        # Standard formatter with timestamp, level, name, and message
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        
+        # Create a structured formatter for file output
+        structured_formatter = logging.Formatter('%(levelname)s - %(asctime)s - %(message)s', 
                                      datefmt='%b %d, %Y %H:%M:%S')
         
         # Console handler (stdout)
         stdout_handler = logging.StreamHandler(sys.stdout)
-        stdout_handler.setFormatter(formatter)
+        stdout_handler.setFormatter(formatter)  # Use standard formatter for console
         logger.addHandler(stdout_handler)
         
         # File handler for all logs
@@ -98,7 +117,7 @@ def get_logger(name: str) -> ContextAdapter:
             maxBytes=10485760,  # 10MB
             backupCount=5
         )
-        file_handler.setFormatter(formatter)
+        file_handler.setFormatter(structured_formatter)  # Use structured formatter for files
         logger.addHandler(file_handler)
         
         # File handler for debug logs only
@@ -107,7 +126,7 @@ def get_logger(name: str) -> ContextAdapter:
             maxBytes=10485760,  # 10MB
             backupCount=2
         )
-        debug_handler.setFormatter(formatter)
+        debug_handler.setFormatter(structured_formatter)
         debug_handler.setLevel(logging.DEBUG)
         logger.addHandler(debug_handler)
         
@@ -117,7 +136,7 @@ def get_logger(name: str) -> ContextAdapter:
             maxBytes=10485760,  # 10MB
             backupCount=3
         )
-        error_handler.setFormatter(formatter)
+        error_handler.setFormatter(structured_formatter)
         error_handler.setLevel(logging.ERROR)
         logger.addHandler(error_handler)
 

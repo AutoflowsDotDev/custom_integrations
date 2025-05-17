@@ -2,11 +2,11 @@
 import logging
 from unittest.mock import patch, MagicMock
 
-from src.utils.logger import get_logger
+from src.utils.logger import get_logger, ContextAdapter
 
 
 def test_get_logger_returns_logger_instance():
-    """Test that get_logger returns a logger instance."""
+    """Test that get_logger returns a logger adapter instance."""
     # Arrange
     logger_name = "test_logger"
     
@@ -14,7 +14,7 @@ def test_get_logger_returns_logger_instance():
     logger = get_logger(logger_name)
     
     # Assert
-    assert isinstance(logger, logging.Logger)
+    assert isinstance(logger, ContextAdapter)
     assert logger.name == logger_name
 
 
