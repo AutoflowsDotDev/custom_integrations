@@ -9,7 +9,8 @@ import pytest
 from googleapiclient.errors import HttpError
 
 from src.gmail_service.gmail_client import GmailClient
-from src.core.config import GMAIL_USER_ID, GMAIL_LABEL_URGENT
+from src.core.config import GMAIL_USER_ID, GMAIL_LABEL_URGENT, GOOGLE_SERVICE_ACCOUNT_PATH, GOOGLE_CREDENTIALS_JSON_PATH
+from src.utils.exceptions import GmailAPIError, GmailServiceError, MessageProcessingError
 
 
 @pytest.fixture
@@ -19,6 +20,20 @@ def mock_http_error():
     mock_resp.status = 400
     mock_resp.reason = "Bad Request"
     return HttpError(resp=mock_resp, content=b'{"error": {"message": "Error message"}}')
+
+
+@pytest.fixture
+def mock_gmail_service():
+    """Create a mock Gmail service for testing."""
+    mock_service = MagicMock()
+    
+    # Mock users().labels().list().execute()
+    mock_service.users().labels().list().execute.return_value = {'labels': []}
+    
+    # Mock users().labels().create().execute()
+    mock_service.users().labels().create().execute.return_value = {'id': 'new_label_123', 'name': GMAIL_LABEL_URGENT}
+    
+    return mock_service
 
 
 @pytest.fixture
@@ -60,7 +75,7 @@ class TestGmailClient:
         mock_build.return_value = mock_gmail_service
         
         # Mock Credentials.from_authorized_user_file to return valid credentials
-        with patch('os.path.exists', return_value=True), \
+        with patch('os.path.exists', side_effect=lambda path: path != GOOGLE_SERVICE_ACCOUNT_PATH), \
              patch('src.gmail_service.gmail_client.Credentials') as mock_creds:
             mock_creds.from_authorized_user_file.return_value = MagicMock(valid=True)
             
@@ -78,7 +93,7 @@ class TestGmailClient:
         mock_build.return_value = mock_gmail_service
         
         # Mock invalid credentials that need refresh
-        with patch('os.path.exists', return_value=True), \
+        with patch('os.path.exists', side_effect=lambda path: path != GOOGLE_SERVICE_ACCOUNT_PATH if path == GOOGLE_SERVICE_ACCOUNT_PATH else True), \
              patch('src.gmail_service.gmail_client.Credentials') as mock_creds, \
              patch('src.gmail_service.gmail_client.Request') as mock_request:
             mock_instance = MagicMock(valid=False, expired=True, refresh_token=True)
@@ -96,8 +111,16 @@ class TestGmailClient:
         # Arrange
         mock_build.return_value = mock_gmail_service
         
-        # First False for service account, then False for credentials, then True for client secrets
-        with patch('os.path.exists', side_effect=[False, False, True]), \
+        # Service account path: False, Credentials path: False, Client secrets: True
+        def path_exists_side_effect(path):
+            if path == GOOGLE_SERVICE_ACCOUNT_PATH:
+                return False
+            elif path == GOOGLE_CREDENTIALS_JSON_PATH:
+                return False
+            else:
+                return True
+                
+        with patch('os.path.exists', side_effect=path_exists_side_effect), \
              patch('src.gmail_service.gmail_client.InstalledAppFlow') as mock_flow, \
              patch('builtins.open', mock_open()) as mock_file:
             mock_flow_instance = MagicMock()
@@ -117,7 +140,11 @@ class TestGmailClient:
         # Arrange
         mock_build.return_value = mock_gmail_service
         
-        with patch('os.path.exists', return_value=True), \
+        # Make service account path exist but not the other paths
+        def path_exists_side_effect(path):
+            return path == GOOGLE_SERVICE_ACCOUNT_PATH
+                
+        with patch('os.path.exists', side_effect=path_exists_side_effect), \
              patch('src.gmail_service.gmail_client.service_account.Credentials') as mock_sa_creds:
             # Setup service account mock
             mock_sa_creds.from_service_account_file.return_value = MagicMock()
@@ -144,7 +171,7 @@ class TestGmailClient:
         ]}
         mock_gmail_service.users().labels().list().execute.return_value = mock_labels_response
         
-        with patch('os.path.exists', return_value=True), \
+        with patch('os.path.exists', side_effect=lambda path: path != GOOGLE_SERVICE_ACCOUNT_PATH), \
              patch('src.gmail_service.gmail_client.Credentials') as mock_creds:
             mock_creds.from_authorized_user_file.return_value = MagicMock(valid=True)
             client = GmailClient()
@@ -174,7 +201,7 @@ class TestGmailClient:
         mock_created_label = {'id': 'newlabel123', 'name': GMAIL_LABEL_URGENT}
         mock_gmail_service.users().labels().create().execute.return_value = mock_created_label
         
-        with patch('os.path.exists', return_value=True), \
+        with patch('os.path.exists', side_effect=lambda path: path != GOOGLE_SERVICE_ACCOUNT_PATH), \
              patch('src.gmail_service.gmail_client.Credentials') as mock_creds:
             mock_creds.from_authorized_user_file.return_value = MagicMock(valid=True)
             client = GmailClient()
@@ -197,7 +224,7 @@ class TestGmailClient:
         mock_build.return_value = mock_gmail_service
         mock_gmail_service.users().messages().get().execute.return_value = mock_email_response
         
-        with patch('os.path.exists', return_value=True), \
+        with patch('os.path.exists', side_effect=lambda path: path != GOOGLE_SERVICE_ACCOUNT_PATH), \
              patch('src.gmail_service.gmail_client.Credentials') as mock_creds:
             mock_creds.from_authorized_user_file.return_value = MagicMock(valid=True)
             client = GmailClient()
@@ -222,23 +249,21 @@ class TestGmailClient:
         mock_build.return_value = mock_gmail_service
         mock_gmail_service.users().messages().get().execute.side_effect = mock_http_error
         
-        with patch('os.path.exists', return_value=True), \
+        with patch('os.path.exists', side_effect=lambda path: path != GOOGLE_SERVICE_ACCOUNT_PATH), \
              patch('src.gmail_service.gmail_client.Credentials') as mock_creds:
             mock_creds.from_authorized_user_file.return_value = MagicMock(valid=True)
             client = GmailClient()
             
-            # Act
-            email_data = client.get_email_details('msg123')
-            
-            # Assert
-            assert email_data is None
+            # Act & Assert
+            with pytest.raises(GmailAPIError):
+                client.get_email_details('msg123')
 
     def test_apply_urgent_label(self, mock_build, mock_gmail_service):
         """Test applying urgent label to an email."""
         # Arrange
         mock_build.return_value = mock_gmail_service
         
-        with patch('os.path.exists', return_value=True), \
+        with patch('os.path.exists', side_effect=lambda path: path != GOOGLE_SERVICE_ACCOUNT_PATH), \
              patch('src.gmail_service.gmail_client.Credentials') as mock_creds:
             mock_creds.from_authorized_user_file.return_value = MagicMock(valid=True)
             client = GmailClient()
@@ -265,8 +290,9 @@ class TestGmailClient:
         }
         mock_gmail_service.users().watch().execute.return_value = mock_watch_response
         
-        with patch('os.path.exists', return_value=True), \
-             patch('src.gmail_service.gmail_client.Credentials') as mock_creds:
+        with patch('os.path.exists', side_effect=lambda path: path != GOOGLE_SERVICE_ACCOUNT_PATH), \
+             patch('src.gmail_service.gmail_client.Credentials') as mock_creds, \
+             patch.dict('os.environ', {'GOOGLE_CLOUD_PROJECT_ID': 'test-project', 'GOOGLE_PUBSUB_TOPIC_ID': 'test-topic'}):
             mock_creds.from_authorized_user_file.return_value = MagicMock(valid=True)
             client = GmailClient()
             
@@ -292,7 +318,7 @@ class TestGmailClient:
             assert watch_call_args[1]['userId'] == 'me'
             
             mock_gmail_service.users().watch.assert_called_once()
-            expected_topic_name = f"projects/{os.environ['GOOGLE_CLOUD_PROJECT_ID']}/topics/{os.environ['GOOGLE_PUBSUB_TOPIC_ID']}"
+            expected_topic_name = f"projects/test-project/topics/test-topic"
             watch_request = mock_gmail_service.users().watch.call_args[1]['body']
             assert watch_request['topicName'] == expected_topic_name
             assert watch_request['labelIds'] == ['INBOX']
@@ -302,7 +328,7 @@ class TestGmailClient:
         # Arrange
         mock_build.return_value = mock_gmail_service
         
-        with patch('os.path.exists', return_value=True), \
+        with patch('os.path.exists', side_effect=lambda path: path != GOOGLE_SERVICE_ACCOUNT_PATH), \
              patch('src.gmail_service.gmail_client.Credentials') as mock_creds:
             mock_creds.from_authorized_user_file.return_value = MagicMock(valid=True)
             client = GmailClient()

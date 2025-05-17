@@ -1,5 +1,6 @@
 """Tests for the slack_client module."""
 from unittest.mock import patch, MagicMock
+from datetime import datetime
 
 import pytest
 from slack_sdk.errors import SlackApiError
@@ -15,6 +16,21 @@ def mock_slack_client():
         mock_instance = MagicMock()
         mock_web_client.return_value = mock_instance
         yield mock_instance
+
+
+@pytest.fixture
+def mock_analyzed_urgent_email_data():
+    """Create a mock of analyzed urgent email data."""
+    return {
+        'id': 'urgent123',
+        'thread_id': 'urgentthread123',
+        'subject': 'URGENT: Action Required Immediately',
+        'sender': 'important@example.com',
+        'received_timestamp': datetime.now(),
+        'is_urgent': True,
+        'confidence_score': 0.95,
+        'summary': 'Urgent matter requiring immediate attention and response.'
+    }
 
 
 class TestSlackServiceClient:

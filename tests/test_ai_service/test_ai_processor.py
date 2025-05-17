@@ -32,6 +32,36 @@ def mock_summarization_pipeline():
     return pipeline_mock
 
 
+@pytest.fixture
+def mock_email_data():
+    """Create a test email data dictionary."""
+    return {
+        'id': 'test123',
+        'thread_id': 'thread123',
+        'subject': 'Test Subject',
+        'sender': 'test@example.com',
+        'body_plain': 'This is a test email body.',
+        'body_html': '<p>This is a test email body.</p>',
+        'received_timestamp': datetime.now(),
+        'snippet': 'This is a test email snippet.'
+    }
+
+
+@pytest.fixture
+def mock_urgent_email_data():
+    """Create a test urgent email data dictionary."""
+    return {
+        'id': 'urgent123',
+        'thread_id': 'urgentthread123',
+        'subject': 'URGENT: Action Required Immediately',
+        'sender': 'important@example.com',
+        'body_plain': 'This is an urgent email requiring immediate action. Please respond ASAP.',
+        'body_html': '<p>This is an urgent email requiring immediate action. Please respond ASAP.</p>',
+        'received_timestamp': datetime.now(),
+        'snippet': 'This is an urgent email requiring immediate action...'
+    }
+
+
 class TestAIProcessor:
     """Tests for the AIProcessor class."""
 
