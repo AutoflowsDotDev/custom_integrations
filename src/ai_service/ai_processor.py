@@ -54,13 +54,10 @@ class AIProcessor:
             "max_tokens": max_tokens
         }
         
-        try:
-            response = requests.post(self.api_url, headers=headers, json=payload)
-            response.raise_for_status()
-            return response.json()
-        except Exception as e:
-            logger.error(f"OpenRouter API request failed: {e}")
-            raise
+        # Let the exception propagate to the caller for handling
+        response = requests.post(self.api_url, headers=headers, json=payload)
+        response.raise_for_status()
+        return response.json()
 
     def _get_text_for_analysis(self, email_data: EmailData) -> str:
         """Extracts and combines relevant text from email for AI analysis."""
