@@ -12,6 +12,7 @@ alwaysApply: false
         • Create detailed README.md with:
         - Project overview and purpose
         - Installation instructions
+        - Deployement instructions (install scripts, Dockerfiles, CI/CD pipelines) 
         - Usage examples
         - Configuration options
     </user_docs>
