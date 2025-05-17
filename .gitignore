@@ -137,4 +137,13 @@ dmypy.json
 
 # OS generated files
 .DS_Store
-Thumbs.db 
+Thumbs.db
+
+# Application specific
+src/logs/
+logs/
+src/logs/run_number.txt
+src/logs/app.log
+src/logs/app_debug.log
+src/logs/app_error.log
+*.log.* 

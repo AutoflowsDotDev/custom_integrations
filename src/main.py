@@ -40,24 +40,36 @@ def process_new_email(email_id: str) -> bool:
     Returns:
         bool: True if processing was successful, False otherwise
     """
+    logger.set_step("1-process_email")
     try:
         gmail_client = GmailClient()
         ai_processor = AIProcessor()
         slack_client = SlackServiceClient()
         
         # Get email details
+        logger.set_step("2-fetch_email")
+        logger.info(f"Fetching email details for ID: {email_id}")
         email_data = gmail_client.get_email_details(email_id)
         if not email_data:
             logger.warning(f"Could not retrieve details for email ID: {email_id}")
             return False
             
         # Analyze the email
+        logger.set_step("3-analyze_email")
+        logger.info(f"Analyzing email: {email_id}")
         analyzed_email = ai_processor.process_email(email_data)
         
         # If urgent, apply label and send notification
         if analyzed_email['is_urgent']:
+            logger.set_step("4-label_urgent")
+            logger.info(f"Email {email_id} marked as urgent, applying label")
             gmail_client.apply_urgent_label(email_id)
+            
+            logger.set_step("5-notify_slack")
+            logger.info(f"Sending urgent notification to Slack for email {email_id}")
             slack_client.send_urgent_email_notification(analyzed_email)
+        else:
+            logger.info(f"Email {email_id} is not urgent, no further action needed")
             
         return True
     except GmailServiceError as e:
@@ -81,9 +93,12 @@ class EmailProcessor:
     
     def __init__(self) -> None:
         """Initialize the email processor."""
+        logger.set_step("init_email_processor")
+        logger.info("Initializing EmailProcessor")
         self.gmail_client = GmailClient()
         self.ai_processor = AIProcessor()
         self.slack_client = SlackServiceClient()
+        logger.info("EmailProcessor initialized successfully")
         
     def process_email(self, email_id: str) -> bool:
         """Process a single email.
@@ -102,27 +117,37 @@ class EmailProcessor:
         Args:
             history_id: The history ID from the notification
         """
+        logger.set_step("1-history_notification")
+        logger.info(f"Processing new email notification with history ID: {history_id}")
+        
         if not self.gmail_client:
             logger.error("Gmail client is not initialized.")
             return
             
         try:
             # Get history records
+            logger.set_step("2-fetch_history")
+            logger.info(f"Fetching history records for ID: {history_id}")
             history_response = self.gmail_client.get_history(history_id)
             if not history_response:
                 logger.warning(f"No history found for history ID: {history_id}")
                 return
                 
             # Extract message IDs from history
+            logger.set_step("3-extract_message_ids")
             message_ids = []
             for history_record in history_response.get('history', []):
                 for msg_added in history_record.get('messagesAdded', []):
                     msg_id = msg_added.get('message', {}).get('id')
                     if msg_id:
                         message_ids.append(msg_id)
+            
+            logger.info(f"Extracted {len(message_ids)} message ID(s) from history")
                         
             # Process each message
+            logger.set_step("4-process_messages")
             for msg_id in message_ids:
+                logger.info(f"Processing message ID: {msg_id}")
                 self.process_email(msg_id)
                 
         except GmailAPIError as e:
@@ -140,6 +165,7 @@ class EmailTriageApp:
     """Orchestrates the email triage workflow."""
 
     def __init__(self) -> None:
+        logger.set_step("init_app")
         logger.info("Initializing Email Triage Application...")
         try:
             self.gmail_client = GmailClient()
@@ -178,6 +204,7 @@ class EmailTriageApp:
             logger.info("Application is shutting down. Ignoring new email notification.")
             return
 
+        logger.set_step("1-receive_notification")
         logger.info(f"Received new email notification with History ID: {history_id}")
         if not self.gmail_client or not self.gmail_client.service:
             logger.error("Gmail client not available. Cannot process email.")
@@ -185,13 +212,8 @@ class EmailTriageApp:
 
         try:
             # Use history.list to get new messages since the last known historyId
-            # This requires storing and updating the last historyId processed.
-            # For simplicity, this example will fetch the most recent message if history.list is complex.
-            # A more robust solution would be needed here.
-            
-            # Conceptual: Fetch new message IDs from history_id
-            # This is a simplified approach. A robust implementation needs to handle history records properly.
-            # It might involve listing history and extracting messageAdded events.
+            logger.set_step("2-fetch_history")
+            logger.info(f"Fetching history for history ID: {history_id}")
             history_response = self.gmail_client.service.users().history().list(
                 userId=GMAIL_USER_ID, 
                 startHistoryId=history_id,
@@ -205,6 +227,7 @@ class EmailTriageApp:
                 # or it's the very first history_id from watch setup with no prior messages.
                 return
 
+            logger.set_step("3-extract_messages")
             message_ids_to_process: List[str] = []
             for record in history_records:
                 messages_added = record.get('messagesAdded', [])
@@ -217,11 +240,13 @@ class EmailTriageApp:
                 logger.info(f"No new messages extracted from history for history_id: {history_id}")
                 return
 
-            logger.info(f"Extracted {len(message_ids_to_process)} new message ID(s) from history: {message_ids_to_process}")
+            logger.info(f"Extracted {len(message_ids_to_process)} new message ID(s) from history")
 
+            logger.set_step("4-process_messages")
             for message_id in message_ids_to_process:
                 logger.info(f"Processing message ID: {message_id}")
                 try:
+                    logger.set_step("5-fetch_email")
                     email_data: Optional[EmailData] = self.gmail_client.get_email_details(message_id)
 
                     if not email_data:
@@ -230,17 +255,23 @@ class EmailTriageApp:
 
                     logger.debug(f"Email data for {message_id}: Subject - '{email_data.get('subject')}'")
 
+                    logger.set_step("6-analyze_email")
+                    logger.info(f"Analyzing email {message_id}...")
                     analyzed_email: AnalyzedEmailData = self.ai_processor.process_email(email_data)
                     logger.info(f"AI Analysis for {message_id}: Urgent - {analyzed_email['is_urgent']}, Summary - '{analyzed_email['summary'][:50]}...'")
 
                     if analyzed_email['is_urgent']:
+                        logger.set_step("7-process_urgent")
                         logger.info(f"Email {message_id} is urgent. Applying label and sending Slack notification.")
+                        
+                        logger.set_step("7a-apply_label")
                         label_success = self.gmail_client.apply_urgent_label(message_id)
                         if label_success:
                             logger.info(f"Successfully applied urgent label to {message_id}.")
                         else:
                             logger.error(f"Failed to apply urgent label to {message_id}.")
                         
+                        logger.set_step("7b-notify_slack")
                         slack_success = self.slack_client.send_urgent_email_notification(analyzed_email)
                         if slack_success:
                             logger.info(f"Successfully sent Slack notification for {message_id}.")
@@ -278,6 +309,8 @@ class EmailTriageApp:
         """Starts the email triage application.
         Sets up Gmail push notifications and starts the Pub/Sub listener.
         """
+        logger.set_step("start_app")
+        
         if not self.gmail_client or not self.gmail_client.service:
             logger.critical("Gmail client is not initialized. Application cannot start.")
             return
@@ -285,17 +318,16 @@ class EmailTriageApp:
         logger.info("Starting Email Triage Application workflow...")
         
         # 1. Setup Gmail Push Notifications
-        # This should ideally be done once, or renewed periodically. 
-        # For a long-running service, you might do this at startup.
+        logger.set_step("setup_notifications")
+        logger.info("Setting up Gmail push notifications...")
         if self.gmail_client.setup_push_notifications():
             logger.info("Gmail push notifications set up successfully.")
         else:
             logger.error("Failed to set up Gmail push notifications. The application might not receive new emails.")
-            # Depending on the desired robustness, you might choose to exit or try to periodically retry setup.
-            # For now, we'll continue and let the listener try, but it likely won't get messages.
 
         # 2. Start Pub/Sub Listener
-        # This will block until an error or KeyboardInterrupt
+        logger.set_step("start_listener")
+        logger.info("Starting Pub/Sub listener...")
         try:
             self.pubsub_listener.start_listening(self._handle_new_email_notification)
         except PubSubError as e:
@@ -313,12 +345,8 @@ class EmailTriageApp:
             return # Already stopping or stopped
         
         self._running = False
+        logger.set_step("shutdown_app")
         logger.info("Shutting down Email Triage Application...")
-
-        # Stop Pub/Sub listener (it should handle its own shutdown on future.cancel())
-        # The listener's future.cancel() is called in its own exception/finally blocks.
-        # We might not need explicit stop here if listener manages its lifecycle fully.
-        # However, if the listener is in a separate thread not managed by future, you'd signal it.
 
         # Stop Gmail push notifications (optional, they expire anyway but good practice)
         if self.gmail_client and self.gmail_client.service:
@@ -337,6 +365,7 @@ class EmailTriageApp:
         self.stop()
 
 if __name__ == "__main__":
+    logger.set_step("main")
     app = EmailTriageApp()
     try:
         app.run()
