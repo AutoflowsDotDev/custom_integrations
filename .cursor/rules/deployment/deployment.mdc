@@ -22,7 +22,8 @@ Create all required scripts to properly deploy this automation workflow.
 
 </defaults>
 <cicd>
-    • Implement complete GitHub Actions workflow
+    • Implement complete GitHub Actions workflow (add required yml and toml files)
+    • Make sure all env vars are loaded in yaml's
     • Include CI/CD pipeline configuration
 
 </cicd>
