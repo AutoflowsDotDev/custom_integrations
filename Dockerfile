@@ -10,6 +10,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    cron \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -26,6 +27,7 @@ COPY . .
 # Make scripts executable
 RUN chmod +x /app/entrypoint.sh
 RUN chmod +x /app/src/run_dashboard.py
+RUN chmod +x /app/src/metrics_collector.py
 
 # Expose API port and Dashboard port
 EXPOSE 8000 8501

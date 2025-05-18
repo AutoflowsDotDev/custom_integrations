@@ -14,6 +14,7 @@ kill_timeout = 5
 [processes]
   app_main = "app_main"
   dashboard = "dashboard"
+  metrics_collector = "metrics-collector-daemon"
 
 # Main app service
 [http_service]
@@ -45,6 +46,10 @@ kill_timeout = 5
     port = 8501
     handlers = ["http"]
     force_https = true
+
+# Metrics collector service
+[[services]]
+  processes = ["metrics_collector"]
 
 # Define main app process group with data volume
 [[services]]

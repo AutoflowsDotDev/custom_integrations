@@ -10,6 +10,8 @@ import random  # For demo data, remove in production
 import sqlite3
 import psutil
 from pathlib import Path
+import requests
+import re
 
 # Configure page
 st.set_page_config(
@@ -107,12 +109,275 @@ def get_database_connection():
     data_dir.mkdir(exist_ok=True)
     
     db_path = data_dir / "email_triage.db"
+    
+    # Create the database and tables if they don't exist
     conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    # Create tables if they don't exist
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS email_metrics (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+        date TEXT,
+        emails_processed INTEGER,
+        urgent INTEGER,
+        action_required INTEGER,
+        informational INTEGER,
+        avg_response_time_min REAL
+    )
+    ''')
+    
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS api_metrics (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+        endpoint TEXT,
+        status_code INTEGER,
+        response_time_ms REAL
+    )
+    ''')
+    
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS system_metrics (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+        cpu_percent REAL,
+        memory_percent REAL,
+        disk_percent REAL
+    )
+    ''')
+    
+    conn.commit()
     return conn
 
-def get_mock_data():
+def get_log_data():
+    """Extract metrics from log files"""
+    log_data = []
+    log_dir = Path("/app/logs") if os.path.exists("/app/logs") else Path("./logs")
+    
+    if not log_dir.exists():
+        return []
+    
+    # Look for log files
+    log_files = list(log_dir.glob("*.log"))
+    
+    for log_file in log_files:
+        if not log_file.exists():
+            continue
+            
+        try:
+            with open(log_file, 'r') as f:
+                for line in f:
+                    # Look for lines containing email processing information
+                    if "processed email" in line.lower():
+                        log_data.append(line.strip())
+        except Exception as e:
+            st.warning(f"Could not read log file {log_file}: {str(e)}")
+    
+    return log_data
+
+def get_api_metrics():
+    """Get API metrics from Prometheus metrics endpoint"""
+    api_metrics = {}
+    
+    try:
+        # Try to get metrics from the API server's metrics endpoint
+        api_url = "http://localhost:8000/metrics"
+        response = requests.get(api_url, timeout=2)
+        
+        if response.status_code == 200:
+            # Parse prometheus metrics
+            for line in response.text.split('\n'):
+                if line.startswith('api_'):
+                    parts = line.split(' ')
+                    if len(parts) >= 2:
+                        name = parts[0]
+                        value = float(parts[1])
+                        api_metrics[name] = value
+    except Exception as e:
+        st.warning(f"Could not get API metrics: {str(e)}")
+    
+    return api_metrics
+
+def parse_log_data(log_data):
+    """Parse log data for email processing information"""
+    email_counts = {}
+    urgent_counts = {}
+    action_counts = {}
+    info_counts = {}
+    response_times = {}
+    
+    for line in log_data:
+        try:
+            # Extract date (assumes ISO format date at start of line)
+            date_match = re.search(r'\d{4}-\d{2}-\d{2}', line)
+            if date_match:
+                date = date_match.group(0)
+                
+                # Increment total emails for the date
+                if "processed email" in line.lower():
+                    email_counts[date] = email_counts.get(date, 0) + 1
+                
+                # Categorize emails based on priority
+                if "urgent" in line.lower():
+                    urgent_counts[date] = urgent_counts.get(date, 0) + 1
+                elif "action required" in line.lower():
+                    action_counts[date] = action_counts.get(date, 0) + 1
+                elif "informational" in line.lower():
+                    info_counts[date] = info_counts.get(date, 0) + 1
+                
+                # Extract response time if available
+                time_match = re.search(r'response time: (\d+\.?\d*)', line)
+                if time_match:
+                    time_val = float(time_match.group(1))
+                    if date in response_times:
+                        response_times[date].append(time_val)
+                    else:
+                        response_times[date] = [time_val]
+        except Exception as e:
+            st.warning(f"Error parsing log line: {str(e)}")
+    
+    return email_counts, urgent_counts, action_counts, info_counts, response_times
+
+def get_real_data():
+    """Get real data from the database and other sources"""
+    conn = get_database_connection()
+    cursor = conn.cursor()
+    
+    # Initialize with empty values
+    daily_df = pd.DataFrame()
+    current_stats = {
+        'total_emails': 0,
+        'emails_today': 0,
+        'avg_response_time': 0,
+        'success_rate': 100.0  # Default to 100%
+    }
+    classification_df = pd.DataFrame({
+        'category': ['Urgent', 'Action Required', 'Informational'],
+        'count': [0, 0, 0]
+    })
+    system_metrics = {
+        'cpu_usage': psutil.cpu_percent(),
+        'memory_usage': psutil.virtual_memory().percent,
+        'disk_usage': psutil.disk_usage('/').percent,
+        'api_success_rate': 100.0,
+        'api_calls_per_min': 0
+    }
+    
+    try:
+        # Get email metrics from database
+        cursor.execute('''
+        SELECT date, SUM(emails_processed), SUM(urgent), SUM(action_required), 
+               SUM(informational), AVG(avg_response_time_min)
+        FROM email_metrics
+        GROUP BY date
+        ORDER BY date
+        LIMIT 30
+        ''')
+        results = cursor.fetchall()
+        
+        if results:
+            daily_df = pd.DataFrame(results, columns=[
+                'date', 'emails_processed', 'urgent', 'action_required', 
+                'informational', 'avg_response_time_min'
+            ])
+        
+        # If no database results, try to parse log files
+        if daily_df.empty:
+            log_data = get_log_data()
+            if log_data:
+                email_counts, urgent_counts, action_counts, info_counts, response_times = parse_log_data(log_data)
+                
+                # Convert to DataFrame
+                dates = sorted(list(email_counts.keys()))
+                emails_processed = [email_counts.get(date, 0) for date in dates]
+                urgent = [urgent_counts.get(date, 0) for date in dates]
+                action_required = [action_counts.get(date, 0) for date in dates]
+                informational = [info_counts.get(date, 0) for date in dates]
+                avg_response_time = []
+                
+                for date in dates:
+                    if date in response_times and response_times[date]:
+                        avg_response_time.append(sum(response_times[date]) / len(response_times[date]))
+                    else:
+                        avg_response_time.append(0)
+                
+                daily_df = pd.DataFrame({
+                    'date': dates,
+                    'emails_processed': emails_processed,
+                    'urgent': urgent,
+                    'action_required': action_required,
+                    'informational': informational,
+                    'avg_response_time_min': avg_response_time
+                })
+        
+        # If we still have no data, fall back to mock data with a warning
+        if daily_df.empty:
+            st.warning("No email processing data found. Using mock data for demonstration.")
+            # Generate mock data (same as before but marked as mock)
+            return get_mock_data(is_mock=True)
+        
+        # Calculate aggregate statistics
+        today = datetime.now().strftime("%Y-%m-%d")
+        
+        # Total emails processed
+        current_stats['total_emails'] = daily_df['emails_processed'].sum()
+        
+        # Emails processed today
+        today_df = daily_df[daily_df['date'] == today]
+        current_stats['emails_today'] = today_df['emails_processed'].sum() if not today_df.empty else 0
+        
+        # Average response time
+        current_stats['avg_response_time'] = daily_df['avg_response_time_min'].mean()
+        
+        # Get API metrics
+        api_metrics = get_api_metrics()
+        if api_metrics:
+            if 'api_success_rate' in api_metrics:
+                system_metrics['api_success_rate'] = api_metrics['api_success_rate']
+            if 'api_requests_per_minute' in api_metrics:
+                system_metrics['api_calls_per_min'] = api_metrics['api_requests_per_minute']
+        
+        # Calculate success rate from API metrics or database
+        cursor.execute('''
+        SELECT COUNT(*) FROM api_metrics WHERE status_code < 400
+        ''')
+        success_count = cursor.fetchone()[0] or 0
+        
+        cursor.execute('''
+        SELECT COUNT(*) FROM api_metrics
+        ''')
+        total_count = cursor.fetchone()[0] or 0
+        
+        if total_count > 0:
+            current_stats['success_rate'] = (success_count / total_count) * 100
+        
+        # Get classification breakdown
+        total_urgent = daily_df['urgent'].sum()
+        total_action = daily_df['action_required'].sum()
+        total_info = daily_df['informational'].sum()
+        
+        classification_df = pd.DataFrame({
+            'category': ['Urgent', 'Action Required', 'Informational'],
+            'count': [total_urgent, total_action, total_info]
+        })
+        
+        # System metrics are already collected with psutil above
+        
+    except Exception as e:
+        st.error(f"Error retrieving real data: {str(e)}")
+        # Fall back to mock data
+        return get_mock_data(is_mock=True)
+    finally:
+        conn.close()
+    
+    return daily_df, current_stats, classification_df, system_metrics
+
+def get_mock_data(is_mock=False):
     """Generate mock data for demonstration"""
-    # In production, replace this with actual database queries
+    if is_mock:
+        st.warning("Using mock data for demonstration purposes")
     
     # Mock email processing data
     now = datetime.now()
@@ -170,9 +435,9 @@ refresh_placeholder = st.empty()
 
 # Main function to update dashboard
 def update_dashboard():
-    # Get data (mock or real)
+    # Get data (real or fallback to mock)
     try:
-        daily_df, current_stats, classification_df, system_metrics = get_mock_data()
+        daily_df, current_stats, classification_df, system_metrics = get_real_data()
         
         # Update refresh timestamp
         refresh_placeholder.markdown(f"Last refreshed: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")

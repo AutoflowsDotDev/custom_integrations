@@ -13,9 +13,33 @@ elif [ "$1" = "api" ]; then
     # Start the API server
     echo "Starting API server..."
     exec python src/api_server.py --host 0.0.0.0 --port 8000
+elif [ "$1" = "metrics-collector" ]; then
+    # Run the metrics collector once
+    echo "Running metrics collector..."
+    exec python src/metrics_collector.py
+elif [ "$1" = "metrics-collector-daemon" ]; then
+    # Run the metrics collector on a schedule
+    echo "Starting metrics collector daemon..."
+    
+    # Make the script executable
+    chmod +x /app/src/metrics_collector.py
+    
+    # Create a cron job to run the metrics collector every 5 minutes
+    echo "*/5 * * * * /usr/local/bin/python /app/src/metrics_collector.py >> /app/data/metrics_collector.log 2>&1" > /tmp/crontab
+    crontab /tmp/crontab
+    rm /tmp/crontab
+    
+    # Start cron and keep container running
+    cron
+    
+    # Run once immediately
+    python /app/src/metrics_collector.py
+    
+    # Keep container running
+    tail -f /dev/null
 else
-    # Default: start both in parallel
-    echo "Starting API server and dashboard..."
+    # Default: start everything in parallel
+    echo "Starting API server, dashboard, and metrics collector..."
     
     # Start API server in background
     python src/api_server.py --host 0.0.0.0 --port 8000 &
@@ -24,6 +48,19 @@ else
     # Start dashboard in background
     python /app/src/run_dashboard.py &
     DASHBOARD_PID=$!
+    
+    # Set up metrics collector cron job
+    echo "Setting up metrics collector..."
+    chmod +x /app/src/metrics_collector.py
+    echo "*/5 * * * * /usr/local/bin/python /app/src/metrics_collector.py >> /app/data/metrics_collector.log 2>&1" > /tmp/crontab
+    crontab /tmp/crontab
+    rm /tmp/crontab
+    
+    # Start cron
+    cron
+    
+    # Run metrics collector once immediately
+    python /app/src/metrics_collector.py &
     
     # Function to handle graceful shutdown
     function handle_shutdown {
