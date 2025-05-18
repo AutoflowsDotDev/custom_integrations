@@ -17,6 +17,14 @@ prometheus-client==0.20.0  # For metrics
 python-multipart==0.0.9  # For form data processing
 psutil==5.9.8  # For system monitoring in health checks
 
+# Dashboard dependencies
+streamlit==1.32.0
+pandas==2.2.0
+plotly==5.20.0
+altair==5.2.0
+matplotlib==3.8.3
+seaborn==0.13.1
+
 # Optional: For a web server if handling Pub/Sub push via HTTP endpoint
 # flask==3.0.3
 # uvicorn[standard]==0.29.0 # For running FastAPI 

@@ -8,10 +8,12 @@ kill_timeout = 5
 
 [env]
   PORT = "8000"
+  DASHBOARD_PORT = "8501"
 
 # Process definitions
 [processes]
   app_main = "app_main"
+  dashboard = "dashboard"
 
 # Main app service
 [http_service]
@@ -30,6 +32,19 @@ kill_timeout = 5
   path = "/api/v1/health"
   protocol = "http"
   timeout = "10s"
+
+# Dashboard service
+[[services]]
+  http_checks = []
+  internal_port = 8501
+  processes = ["dashboard"]
+  protocol = "tcp"
+  script_checks = []
+
+  [[services.ports]]
+    port = 8501
+    handlers = ["http"]
+    force_https = true
 
 # Define main app process group with data volume
 [[services]]

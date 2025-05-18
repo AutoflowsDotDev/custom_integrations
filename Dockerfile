@@ -23,11 +23,12 @@ RUN mkdir -p /app/data
 # Copy application code
 COPY . .
 
-# Make the entrypoint script executable
+# Make scripts executable
 RUN chmod +x /app/entrypoint.sh
+RUN chmod +x /app/src/run_dashboard.py
 
-# Expose API port
-EXPOSE 8000
+# Expose API port and Dashboard port
+EXPOSE 8000 8501
 
 # Use entrypoint script
 ENTRYPOINT ["/app/entrypoint.sh"] 
