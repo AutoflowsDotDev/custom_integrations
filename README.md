@@ -149,11 +149,22 @@ The GitHub Actions workflow is defined in `.github/workflows/deploy-to-fly.yml`.
    - `GOOGLE_CLIENT_SECRET`: Content of your `client_secret.json` file
    - `GOOGLE_CREDENTIALS`: Content of your `credentials.json` file 
    - `GOOGLE_SERVICE_ACCOUNT`: Content of your `service_account.json` file
+   
+   Additionally, add all application environment variables as secrets:
+   - `API_KEY`: Your API key
+   - `GOOGLE_CLOUD_PROJECT_ID`: Your Google Cloud project ID
+   - `GOOGLE_PUBSUB_TOPIC_ID`: Your Pub/Sub topic ID
+   - `GOOGLE_PUBSUB_SUBSCRIPTION_ID`: Your Pub/Sub subscription ID
+   - `SLACK_BOT_TOKEN`: Your Slack bot token
+   - `SLACK_CHANNEL_ID`: Your Slack channel ID
+   - `OPENAI_API_KEY` or `OPENROUTER_API_KEY`: Your OpenAI or OpenRouter API key
 
-4. **Additional Environment Variables:**
-   Add other environment variables required for your application through the Fly.io dashboard or CLI:
+   These environment variables will be automatically set as secrets in your Fly.io application during deployment.
+
+4. **Custom Environment Variables:**
+   If you need to add or modify environment variables later, you can do so through the Fly.io dashboard or CLI:
    ```bash
-   flyctl secrets set API_KEY=your_api_key SLACK_BOT_TOKEN=your_slack_token
+   flyctl secrets set NEW_VARIABLE=value
    ```
 
 After setup, every push to the main branch will trigger the deployment workflow.

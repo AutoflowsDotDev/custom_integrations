@@ -30,6 +30,21 @@ jobs:
           echo '${{ secrets.GOOGLE_CREDENTIALS }}' > secrets/credentials.json
           echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT }}' > secrets/service_account.json
         
+      - name: Set environment variables on Fly.io
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          # Set all required environment variables as secrets in Fly.io
+          flyctl secrets set \
+            API_KEY="${{ secrets.API_KEY }}" \
+            GOOGLE_CLOUD_PROJECT_ID="${{ secrets.GOOGLE_CLOUD_PROJECT_ID }}" \
+            GOOGLE_PUBSUB_TOPIC_ID="${{ secrets.GOOGLE_PUBSUB_TOPIC_ID }}" \
+            GOOGLE_PUBSUB_SUBSCRIPTION_ID="${{ secrets.GOOGLE_PUBSUB_SUBSCRIPTION_ID }}" \
+            SLACK_BOT_TOKEN="${{ secrets.SLACK_BOT_TOKEN }}" \
+            SLACK_CHANNEL_ID="${{ secrets.SLACK_CHANNEL_ID }}" \
+            OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
+            --app email-triage-workflow-api
+        
       - name: Deploy to Fly.io
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
