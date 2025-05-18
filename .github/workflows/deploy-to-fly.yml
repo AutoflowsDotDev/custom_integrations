@@ -58,6 +58,18 @@ jobs:
           API_PORT=8000
           EOL
         
+      - name: Create Fly.io app if it doesn't exist
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          # Check if app exists
+          if ! flyctl apps list | grep -q "email-triage-workflow-api"; then
+            echo "Creating Fly.io app 'email-triage-workflow-api'"
+            flyctl apps create email-triage-workflow-api --org personal
+          else
+            echo "Fly.io app 'email-triage-workflow-api' already exists"
+          fi
+        
       - name: Create Fly.io volumes if they don't exist
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
