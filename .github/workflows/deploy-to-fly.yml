@@ -1,0 +1,36 @@
+name: Deploy to Fly.io
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to Fly.io
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Fly.io CLI
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Check .env file and create if not exists
+        run: |
+          if [ ! -f .env ]; then
+            cp .env.example .env
+          fi
+
+      - name: Create secrets directory
+        run: mkdir -p secrets
+
+      - name: Set up Google API credentials
+        run: |
+          echo '${{ secrets.GOOGLE_CLIENT_SECRET }}' > secrets/client_secret.json
+          echo '${{ secrets.GOOGLE_CREDENTIALS }}' > secrets/credentials.json
+          echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT }}' > secrets/service_account.json
+        
+      - name: Deploy to Fly.io
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: flyctl deploy --remote-only 

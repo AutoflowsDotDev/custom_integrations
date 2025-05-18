@@ -127,7 +127,36 @@ docker-compose logs -f
 
 ### CI/CD
 
-(Currently, a specific CI/CD pipeline is not defined. This section can be updated as CI/CD processes are implemented.)
+This project includes a GitHub Actions workflow for continuous deployment to Fly.io. When you push to the main branch, the application will be automatically deployed.
+
+#### GitHub Actions Setup
+
+The GitHub Actions workflow is defined in `.github/workflows/deploy-to-fly.yml`. To use it:
+
+1. **Create a Fly.io Account:**
+   Sign up at [fly.io](https://fly.io/) and install the flyctl CLI locally to test deployments.
+
+2. **Initialize a Fly.io App Locally First:**
+   ```bash
+   flyctl auth login
+   flyctl launch --no-deploy
+   ```
+   This will create the initial fly.toml configuration file.
+
+3. **Set up GitHub Secrets:**
+   In your GitHub repository, go to Settings > Secrets and add:
+   - `FLY_API_TOKEN`: Your Fly.io API token (get it with `flyctl auth token`)
+   - `GOOGLE_CLIENT_SECRET`: Content of your `client_secret.json` file
+   - `GOOGLE_CREDENTIALS`: Content of your `credentials.json` file 
+   - `GOOGLE_SERVICE_ACCOUNT`: Content of your `service_account.json` file
+
+4. **Additional Environment Variables:**
+   Add other environment variables required for your application through the Fly.io dashboard or CLI:
+   ```bash
+   flyctl secrets set API_KEY=your_api_key SLACK_BOT_TOKEN=your_slack_token
+   ```
+
+After setup, every push to the main branch will trigger the deployment workflow.
 
 ## 4. Usage Examples
 
