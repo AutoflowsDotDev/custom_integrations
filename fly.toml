@@ -9,13 +9,14 @@ kill_timeout = 5
 [env]
   PORT = "8000"
 
+# Main app service
 [http_service]
   internal_port = 8000
   force_https = true
   auto_stop_machines = true
   auto_start_machines = true
   min_machines_running = 0
-  processes = ["app"]
+  processes = ["app_main"]
 
 [[http_service.checks]]
   grace_period = "30s"
@@ -25,15 +26,36 @@ kill_timeout = 5
   protocol = "http"
   timeout = "10s"
 
-# Mount volumes for secrets and logs
-[[mounts]]
-  source = "email_triage_data"
-  destination = "/app/data"
+# Define main app process group with data volume
+[[services]]
+  processes = ["app_main"]
+  
+  [services.concurrency]
+    type = "connections"
+    hard_limit = 25
+    soft_limit = 20
 
-[[mounts]]
-  source = "email_triage_secrets"
-  destination = "/app/secrets"
+  [[services.ports]]
+    port = 8000
+    handlers = ["http"]
+    force_https = true
 
-[[mounts]]
-  source = "email_triage_logs"
-  destination = "/app/logs" 
+  [[services.mounts]]
+    source = "email_triage_data"
+    destination = "/app/data"
+
+# Define secrets process group
+[[services]]
+  processes = ["app_secrets"]
+  
+  [[services.mounts]]
+    source = "email_triage_secrets"
+    destination = "/app/secrets"
+
+# Define logs process group
+[[services]]
+  processes = ["app_logs"]
+  
+  [[services.mounts]]
+    source = "email_triage_logs"
+    destination = "/app/logs" 

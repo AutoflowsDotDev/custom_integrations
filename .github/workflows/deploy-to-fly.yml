@@ -65,7 +65,7 @@ jobs:
           # Check if app exists
           if ! flyctl apps list | grep -q "email-triage-workflow-api"; then
             echo "Creating Fly.io app 'email-triage-workflow-api'"
-            flyctl apps create email-triage-workflow-api --org personal
+            flyctl apps create email-triage-workflow-api --org personal --yes
           else
             echo "Fly.io app 'email-triage-workflow-api' already exists"
           fi
@@ -82,4 +82,4 @@ jobs:
       - name: Deploy to Fly.io
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-        run: flyctl deploy --remote-only 
+        run: flyctl deploy --remote-only --yes 
