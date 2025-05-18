@@ -13,6 +13,9 @@ from pathlib import Path
 import requests
 import re
 
+# Import OAuth authentication
+from auth.streamlit_auth import require_auth, render_user_menu
+
 # Configure page
 st.set_page_config(
     page_title="Email Triage Dashboard",
@@ -64,43 +67,47 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Sidebar
-with st.sidebar:
-    st.image("https://img.icons8.com/color/96/000000/email.png", width=80)
-    st.title("Email Triage Dashboard")
-    st.markdown("---")
-    
-    # Date range filter
-    st.subheader("Filters")
-    date_range = st.selectbox(
-        "Time Period",
-        options=["Last 24 Hours", "Last 7 Days", "Last 30 Days", "All Time"],
-        index=1
-    )
+def show_sidebar():
+    with st.sidebar:
+        st.image("https://img.icons8.com/color/96/000000/email.png", width=80)
+        st.title("Email Triage Dashboard")
+        st.markdown("---")
+        
+        # Date range filter
+        st.subheader("Filters")
+        date_range = st.selectbox(
+            "Time Period",
+            options=["Last 24 Hours", "Last 7 Days", "Last 30 Days", "All Time"],
+            index=1
+        )
 
-    # Refresh rate
-    refresh_rate = st.slider(
-        "Refresh Rate (seconds)",
-        min_value=0,
-        max_value=300,
-        value=60,
-        step=10
-    )
-    
-    if refresh_rate > 0:
-        st.info(f"Dashboard refreshes every {refresh_rate} seconds")
-    
-    st.markdown("---")
-    st.markdown("""
-    **Data Sources**
-    - Email Processing Logs
-    - API Usage Metrics
-    - System Performance
-    """)
-    
-    # Add environment info
-    st.markdown("---")
-    st.caption(f"Environment: {'Production' if os.getenv('FLY_APP_NAME') else 'Development'}")
-    st.caption(f"Version: 1.0.0")
+        # Refresh rate
+        refresh_rate = st.slider(
+            "Refresh Rate (seconds)",
+            min_value=0,
+            max_value=300,
+            value=60,
+            step=10
+        )
+        
+        if refresh_rate > 0:
+            st.info(f"Dashboard refreshes every {refresh_rate} seconds")
+        
+        st.markdown("---")
+        st.markdown("""
+        **Data Sources**
+        - Email Processing Logs
+        - API Usage Metrics
+        - System Performance
+        """)
+        
+        # Add environment info
+        st.markdown("---")
+        st.caption(f"Environment: {'Production' if os.getenv('FLY_APP_NAME') else 'Development'}")
+        st.caption(f"Version: 1.0.0")
+        
+        # Render user menu in sidebar
+        render_user_menu()
 
 # Helper functions
 def get_database_connection():
@@ -427,13 +434,8 @@ def get_mock_data(is_mock=False):
     
     return daily_df, current_stats, classification_df, system_metrics
 
-# Main dashboard
-st.markdown('<h1 class="main-header">Email Triage Workflow Dashboard</h1>', unsafe_allow_html=True)
-
-# Placeholder for last refresh timestamp
-refresh_placeholder = st.empty()
-
 # Main function to update dashboard
+@require_auth
 def update_dashboard():
     # Get data (real or fallback to mock)
     try:
@@ -630,27 +632,44 @@ def update_dashboard():
     except Exception as e:
         st.error(f"An error occurred while updating the dashboard: {str(e)}")
 
-# Run the dashboard update function
-update_dashboard()
-
-# Auto-refresh logic
-if refresh_rate > 0:
-    refresh_button = st.empty()
-    refresh_button.button("Refresh Now")
+# Main function
+def main():
+    # Set up the sidebar
+    show_sidebar()
     
-    # Create an auto-refresh mechanism
-    st.markdown(
-        f"""
-        <script>
-            var refreshRate = {refresh_rate * 1000};
-            setInterval(function() {{
-                window.location.reload();
-            }}, refreshRate);
-        </script>
-        """,
-        unsafe_allow_html=True
-    )
+    # Main dashboard content
+    st.markdown('<h1 class="main-header">Email Triage Workflow Dashboard</h1>', unsafe_allow_html=True)
+    
+    # Placeholder for last refresh timestamp
+    global refresh_placeholder
+    refresh_placeholder = st.empty()
+    
+    # Run the dashboard update function with authentication required
+    update_dashboard()
+    
+    # Footer
+    st.markdown("---")
+    st.caption("© 2025 Email Triage Workflow | Data is refreshed automatically")
+    
+    # Auto-refresh logic
+    refresh_rate = st.session_state.get("refresh_rate", 60)
+    if refresh_rate > 0:
+        refresh_button = st.empty()
+        refresh_button.button("Refresh Now")
+        
+        # Create an auto-refresh mechanism
+        st.markdown(
+            f"""
+            <script>
+                var refreshRate = {refresh_rate * 1000};
+                setInterval(function() {{
+                    window.location.reload();
+                }}, refreshRate);
+            </script>
+            """,
+            unsafe_allow_html=True
+        )
 
-# Footer
-st.markdown("---")
-st.caption("© 2025 Email Triage Workflow | Data is refreshed automatically") 
+# Run the application
+if __name__ == "__main__":
+    main() 

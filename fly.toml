@@ -9,6 +9,10 @@ kill_timeout = 5
 [env]
   PORT = "8000"
   DASHBOARD_PORT = "8501"
+  # OAuth2 redirect URIs
+  APP_BASE_URL = "https://email-triage-workflow-api.fly.dev"
+  GOOGLE_REDIRECT_URI = "https://email-triage-workflow-api.fly.dev/google_callback"
+  SLACK_REDIRECT_URI = "https://email-triage-workflow-api.fly.dev/slack_callback"
 
 # Process definitions
 [processes]

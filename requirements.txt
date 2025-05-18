@@ -7,6 +7,10 @@ python-dotenv==1.0.1
 pytest==7.4.3
 pytest-cov==4.1.0
 
+# Auth dependencies
+requests-oauthlib==1.3.1
+oauthlib==3.2.2
+
 # Web server dependencies
 fastapi==0.111.0
 uvicorn[standard]==0.29.0

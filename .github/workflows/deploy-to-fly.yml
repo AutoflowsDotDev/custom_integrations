@@ -55,6 +55,10 @@ jobs:
             OPENAI_API_KEY='${{ secrets.OPENAI_API_KEY }}' \
             OPENROUTER_API_KEY='${{ secrets.OPENROUTER_API_KEY }}' \
             API_KEY='${{ secrets.API_KEY }}' \
+            GOOGLE_CLIENT_ID='${{ secrets.GOOGLE_CLIENT_ID }}' \
+            GOOGLE_CLIENT_SECRET='${{ secrets.GOOGLE_CLIENT_SECRET }}' \
+            SLACK_CLIENT_ID='${{ secrets.SLACK_CLIENT_ID }}' \
+            SLACK_CLIENT_SECRET='${{ secrets.SLACK_CLIENT_SECRET }}' \
             --app email-triage-workflow-api
           
           # Remove temporary files
