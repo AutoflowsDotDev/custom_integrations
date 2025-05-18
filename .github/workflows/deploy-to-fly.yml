@@ -75,9 +75,9 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
           # Create volumes for persistent data storage
-          flyctl volumes list --app email-triage-workflow-api | grep -q "email_triage_data" || flyctl volumes create email_triage_data --app email-triage-workflow-api --region iad --size 1
-          flyctl volumes list --app email-triage-workflow-api | grep -q "email_triage_secrets" || flyctl volumes create email_triage_secrets --app email-triage-workflow-api --region iad --size 1
-          flyctl volumes list --app email-triage-workflow-api | grep -q "email_triage_logs" || flyctl volumes create email_triage_logs --app email-triage-workflow-api --region iad --size 1
+          flyctl volumes list --app email-triage-workflow-api | grep -q "email_triage_data" || flyctl volumes create email_triage_data --app email-triage-workflow-api --region iad --size 1 --yes
+          flyctl volumes list --app email-triage-workflow-api | grep -q "email_triage_secrets" || flyctl volumes create email_triage_secrets --app email-triage-workflow-api --region iad --size 1 --yes
+          flyctl volumes list --app email-triage-workflow-api | grep -q "email_triage_logs" || flyctl volumes create email_triage_logs --app email-triage-workflow-api --region iad --size 1 --yes
         
       - name: Deploy to Fly.io
         env:
