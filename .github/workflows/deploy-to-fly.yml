@@ -1,5 +1,10 @@
 name: Deploy to Fly.io
 
+# This workflow deploys the application to Fly.io
+# Secrets are stored using Fly.io's secrets management system
+# Application data is stored in a persistent volume
+# Logs are handled by Fly.io's built-in logging system
+
 on:
   push:
     branches: [master]
@@ -15,49 +20,6 @@ jobs:
       - name: Setup Fly.io CLI
         uses: superfly/flyctl-actions/setup-flyctl@master
 
-      - name: Create necessary directories
-        run: mkdir -p secrets logs
-
-      - name: Set up Google API credentials
-        run: |
-          echo '${{ secrets.GOOGLE_CLIENT_SECRET }}' > secrets/client_secret.json
-          echo '${{ secrets.GOOGLE_CREDENTIALS }}' > secrets/credentials.json
-          echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT }}' > secrets/service_account.json
-
-      - name: Create .env file from secrets
-        run: |
-          cat > .env << EOL
-          # Gmail API Configuration
-          GOOGLE_CLIENT_SECRETS_JSON_PATH='/app/secrets/client_secret.json'
-          GOOGLE_CREDENTIALS_JSON_PATH='/app/secrets/credentials.json'
-          GOOGLE_SERVICE_ACCOUNT_PATH='/app/secrets/service_account.json'
-          GMAIL_USER_ID='me'
-          GMAIL_LABEL_URGENT='${{ secrets.GMAIL_LABEL_URGENT }}'
-
-          # Google Cloud Pub/Sub Configuration
-          GOOGLE_CLOUD_PROJECT_ID='${{ secrets.GOOGLE_CLOUD_PROJECT_ID }}'
-          GOOGLE_PUBSUB_TOPIC_ID='${{ secrets.GOOGLE_PUBSUB_TOPIC_ID }}'
-          GOOGLE_PUBSUB_SUBSCRIPTION_ID='${{ secrets.GOOGLE_PUBSUB_SUBSCRIPTION_ID }}'
-
-          # Slack API Configuration
-          SLACK_BOT_TOKEN='${{ secrets.SLACK_BOT_TOKEN }}'
-          SLACK_CHANNEL_ID='${{ secrets.SLACK_CHANNEL_ID }}'
-
-          # AI Service Configuration
-          OPENAI_API_KEY='${{ secrets.OPENAI_API_KEY }}'
-          OPENROUTER_API_KEY='${{ secrets.OPENROUTER_API_KEY }}'
-
-          # Application Configuration
-          LOG_LEVEL='INFO'
-
-          # API Server Configuration
-          API_KEY='${{ secrets.API_KEY }}'
-          API_DEBUG=false
-          API_CORS_ORIGINS='*'
-          API_HOST='0.0.0.0'
-          API_PORT=8000
-          EOL
-        
       - name: Create Fly.io app if it doesn't exist
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
@@ -69,15 +31,41 @@ jobs:
           else
             echo "Fly.io app 'email-triage-workflow-api' already exists"
           fi
-        
-      - name: Create Fly.io volumes if they don't exist
+      
+      - name: Set up Fly.io secrets
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
-          # Create volumes for persistent data storage
+          # Gmail API secrets
+          echo '${{ secrets.GOOGLE_CLIENT_SECRET }}' > google_client_secret.json
+          echo '${{ secrets.GOOGLE_CREDENTIALS }}' > google_credentials.json
+          echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT }}' > google_service_account.json
+          
+          # Set all secrets using Fly.io secrets management
+          flyctl secrets set \
+            GOOGLE_CLIENT_SECRET="$(cat google_client_secret.json)" \
+            GOOGLE_CREDENTIALS="$(cat google_credentials.json)" \
+            GOOGLE_SERVICE_ACCOUNT="$(cat google_service_account.json)" \
+            GMAIL_LABEL_URGENT='${{ secrets.GMAIL_LABEL_URGENT }}' \
+            GOOGLE_CLOUD_PROJECT_ID='${{ secrets.GOOGLE_CLOUD_PROJECT_ID }}' \
+            GOOGLE_PUBSUB_TOPIC_ID='${{ secrets.GOOGLE_PUBSUB_TOPIC_ID }}' \
+            GOOGLE_PUBSUB_SUBSCRIPTION_ID='${{ secrets.GOOGLE_PUBSUB_SUBSCRIPTION_ID }}' \
+            SLACK_BOT_TOKEN='${{ secrets.SLACK_BOT_TOKEN }}' \
+            SLACK_CHANNEL_ID='${{ secrets.SLACK_CHANNEL_ID }}' \
+            OPENAI_API_KEY='${{ secrets.OPENAI_API_KEY }}' \
+            OPENROUTER_API_KEY='${{ secrets.OPENROUTER_API_KEY }}' \
+            API_KEY='${{ secrets.API_KEY }}' \
+            --app email-triage-workflow-api
+          
+          # Remove temporary files
+          rm google_client_secret.json google_credentials.json google_service_account.json
+        
+      - name: Create Fly.io data volume if it doesn't exist
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          # Create data volume for persistent storage
           flyctl volumes list --app email-triage-workflow-api | grep -q "email_triage_data" || flyctl volumes create email_triage_data --app email-triage-workflow-api --region iad --size 1 --yes
-          flyctl volumes list --app email-triage-workflow-api | grep -q "email_triage_secrets" || flyctl volumes create email_triage_secrets --app email-triage-workflow-api --region iad --size 1 --yes
-          flyctl volumes list --app email-triage-workflow-api | grep -q "email_triage_logs" || flyctl volumes create email_triage_logs --app email-triage-workflow-api --region iad --size 1 --yes
         
       - name: Deploy to Fly.io
         env:

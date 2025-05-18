@@ -12,8 +12,6 @@ kill_timeout = 5
 # Process definitions
 [processes]
   app_main = "app_main"
-  app_secrets = "app_secrets"
-  app_logs = "app_logs"
 
 # Main app service
 [http_service]
@@ -52,38 +50,4 @@ kill_timeout = 5
 
   [[services.mounts]]
     source = "email_triage_data"
-    destination = "/app/data"
-
-# Define secrets process group
-[[services]]
-  http_checks = []
-  internal_port = 9001  # Dummy port, not actually used
-  processes = ["app_secrets"]
-  protocol = "tcp"
-  script_checks = []
-  
-  [[services.ports]]
-    port = 9001
-    handlers = ["http"]  # Required field
-    force_https = true
-
-  [[services.mounts]]
-    source = "email_triage_secrets"
-    destination = "/app/secrets"
-
-# Define logs process group
-[[services]]
-  http_checks = []
-  internal_port = 9002  # Dummy port, not actually used
-  processes = ["app_logs"]
-  protocol = "tcp"
-  script_checks = []
-  
-  [[services.ports]]
-    port = 9002
-    handlers = ["http"]  # Required field
-    force_https = true
-
-  [[services.mounts]]
-    source = "email_triage_logs"
-    destination = "/app/logs" 
+    destination = "/app/data" 
