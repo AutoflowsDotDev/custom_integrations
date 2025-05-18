@@ -25,6 +25,15 @@ kill_timeout = 5
   protocol = "http"
   timeout = "10s"
 
-[mounts]
+# Mount volumes for secrets and logs
+[[mounts]]
   source = "email_triage_data"
-  destination = "/app/data" 
+  destination = "/app/data"
+
+[[mounts]]
+  source = "email_triage_secrets"
+  destination = "/app/secrets"
+
+[[mounts]]
+  source = "email_triage_logs"
+  destination = "/app/logs" 
